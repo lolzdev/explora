@@ -54,21 +54,36 @@ impl Uniforms {
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
 pub struct Vertex {
-    pos: [f32; 3],
-    texture_id: u32,
+    data: u32,
 }
 
 impl Vertex {
     pub fn new(v: Vec3<f32>, texture_id: u32) -> Self {
         Self {
-            pos: v.into_array(),
-            texture_id,
+            data: ((v.x as u32 & 0xf) << 28)
+                | ((v.y as u32 & 0xff) << 20)
+                | ((v.z as u32 & 0xf) << 16)
+                | ((((v.x as u32 & 0x10) >> 4) << 3) << 12)
+                | ((((v.y as u32 & 0x100) >> 8) << 2) << 12)
+                | ((((v.z as u32 & 0x10) >> 4) << 1) << 12)
+                | (texture_id & 0xfff),
         }
     }
 
+    pub fn x(&self) -> f32 {
+        (((self.data >> 28) & 0xf) | ((((self.data >> 12) >> 3) & 0x1) << 4)) as f32
+    }
+
+    pub fn y(&self) -> f32 {
+        (((self.data >> 20) & 0xff) | ((((self.data >> 12) >> 2) & 0x1) << 8)) as f32
+    }
+
+    pub fn z(&self) -> f32 {
+        (((self.data >> 16) & 0xf) | ((((self.data >> 12) >> 1) & 0x1) << 4)) as f32
+    }
+
     pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        const ATTRS: [wgpu::VertexAttribute; 2] =
-            wgpu::vertex_attr_array![0 => Float32x3, 1 => Uint32];
+        const ATTRS: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Uint32];
         wgpu::VertexBufferLayout {
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &ATTRS,
@@ -250,10 +265,25 @@ impl Renderer {
                 occlusion_query_set: None,
             });
 
-            self.voxels.draw(&mut render_pass, &self.common_bg);
+            self.voxels
+                .draw(&mut render_pass, &self.common_bg, &self.queue);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
         frame.present();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Vertex;
+    use common::math::Vec3;
+
+    #[test]
+    fn vertex() {
+        let v = Vertex::new(Vec3::new(16.0, 256.0, 16.0), 0);
+        assert_eq!(v.x(), 16.0);
+        assert_eq!(v.y(), 256.0);
+        assert_eq!(v.z(), 16.0);
     }
 }

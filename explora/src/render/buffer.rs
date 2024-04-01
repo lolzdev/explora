@@ -32,6 +32,21 @@ impl<T: Copy + bytemuck::Pod> Buffer<T> {
         }
     }
 
+    /// Creates a new [Buffer] with a given size.
+    pub fn with_size(device: &wgpu::Device, usage: wgpu::BufferUsages, size: u64) -> Self {
+        let descriptor = wgpu::BufferDescriptor {
+            label: Some("Buffer"),
+            usage,
+            mapped_at_creation: false,
+            size,
+        };
+        Self {
+            buf: device.create_buffer(&descriptor),
+            phantom: std::marker::PhantomData,
+            len: size as u32,
+        }
+    }
+
     /// Write data into the buffer.
     ///
     /// If the data is empty it will do nothing to avoid

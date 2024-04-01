@@ -1,3 +1,5 @@
+use std::mem;
+
 use common::{chunk::Chunk, math::Vec2};
 
 use super::{atlas::Atlas, buffer::Buffer, mesh, texture::Texture, Vertex};
@@ -5,10 +7,19 @@ use super::{atlas::Atlas, buffer::Buffer, mesh, texture::Texture, Vertex};
 pub struct Voxels {
     /// Terrain render pipeline
     render_pipeline: wgpu::RenderPipeline,
-    // /// Terrain geometry
-    chunk_meshes: Vec<Buffer<Vertex>>,
+    /// Terrain geometry
+    chunk_meshes: Vec<(Vec2<i32>, Buffer<Vertex>)>,
     /// Terrain indices
     index_buffer: Buffer<u32>,
+    /// Buffer containing the offset of the currently drawn chunk
+    offset_buffer: Buffer<[f32; 2]>,
+    offset_stride: u32,
+    chunk_bg: wgpu::BindGroup,
+}
+
+pub fn ceil_to_next_multiple(value: u32, step: u32) -> u32 {
+    let divide_and_ceil = value / step + (if value % step == 0 { 0 } else { 1 });
+    return step * divide_and_ceil;
 }
 
 impl Voxels {
@@ -25,9 +36,44 @@ impl Voxels {
             ),
         });
 
+
+        let offset_stride = ceil_to_next_multiple(mem::size_of::<f32>() as u32 * 2, 0x100);
+        let offset_buffer = Buffer::with_size(
+            device,
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            offset_stride as u64 * 9,
+        );
+
+        let chunk_bg_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Chunk Bind Group Layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+
+        let chunk_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Chunk Bind Group"),
+            layout: &chunk_bg_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &offset_buffer.buf,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(mem::size_of::<f32>() as u64 * 2),
+                }),
+            }],
+        });
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&common_bg_layout],
+            bind_group_layouts: &[&common_bg_layout, &chunk_bg_layout],
             push_constant_ranges: &[],
         });
 
@@ -86,7 +132,10 @@ impl Voxels {
         for (pos, chunk) in chunk_generation {
             let mut chunk_mesh = vec![];
             mesh::create_chunk_mesh(&chunk, &mut chunk_mesh, pos, atlas);
-            chunk_meshes.push(Buffer::new(device, wgpu::BufferUsages::VERTEX, &chunk_mesh));
+            chunk_meshes.push((
+                pos,
+                Buffer::new(device, wgpu::BufferUsages::VERTEX, &chunk_mesh),
+            ));
             vertex_count += chunk_mesh.len() as u32;
         }
 
@@ -100,6 +149,9 @@ impl Voxels {
             render_pipeline,
             chunk_meshes,
             index_buffer,
+            chunk_bg,
+            offset_buffer,
+            offset_stride
         }
     }
 
@@ -107,13 +159,23 @@ impl Voxels {
         &'a mut self,
         frame: &mut wgpu::RenderPass<'a>,
         common_bg: &'a wgpu::BindGroup,
+        queue: &'a wgpu::Queue,
     ) {
         frame.set_pipeline(&self.render_pipeline);
         frame.set_bind_group(0, common_bg, &[]);
         frame.set_index_buffer(self.index_buffer.slice(), wgpu::IndexFormat::Uint32);
+        let mut stride = 0;
         for chunk_mesh in &self.chunk_meshes {
-            frame.set_vertex_buffer(0, chunk_mesh.slice());
-            frame.draw_indexed(0..chunk_mesh.len() / 4 * 6, 0, 0..1);
+            queue.write_buffer(
+                &self.offset_buffer.buf,
+                (stride) as u64,
+                bytemuck::cast_slice(&[chunk_mesh.0.x as f32, chunk_mesh.0.y as f32]),
+            );
+            
+            frame.set_bind_group(1, &self.chunk_bg, &[stride]);
+            frame.set_vertex_buffer(0, chunk_mesh.1.slice());
+            frame.draw_indexed(0..chunk_mesh.1.len() / 4 * 6, 0, 0..1);
+            stride += self.offset_stride;
         }
     }
 }

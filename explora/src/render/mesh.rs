@@ -5,17 +5,13 @@ use common::{
 
 use super::{atlas::Atlas, Vertex};
 
-pub fn create_chunk_mesh(chunk: &Chunk, mesh: &mut Vec<Vertex>, pos: Vec2<i32>, atlas: &Atlas) {
+pub fn create_chunk_mesh(chunk: &Chunk, mesh: &mut Vec<Vertex>, _pos: Vec2<i32>, atlas: &Atlas) {
     for x in 0..Chunk::SIZE.x {
         for y in 0..Chunk::SIZE.y {
             for z in 0..Chunk::SIZE.z {
                 let origin = Vec3::new(x, y, z).as_::<i32>();
                 let block = chunk.get(origin).unwrap();
-                let offset = Vec3::new(
-                    pos.x as f32 * Chunk::SIZE.x as f32 + x as f32,
-                    y as f32,
-                    pos.y as f32 * Chunk::SIZE.z as f32 + z as f32,
-                );
+                let offset = Vec3::new(x as f32, y as f32, z as f32);
                 let texture = atlas.block_texture(block);
                 // North
                 if Chunk::out_of_bounds(origin + Vec3::unit_z()) {
