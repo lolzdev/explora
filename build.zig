@@ -17,6 +17,7 @@ pub fn build(b: *std.Build) void {
 
     const vk_lib_name = if (target.result.os.tag == .windows) "vulkan-1" else "vulkan";
     exe.linkSystemLibrary(vk_lib_name);
+    exe.linkLibC();
 
     b.installArtifact(exe);
 
