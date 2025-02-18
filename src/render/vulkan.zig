@@ -7,6 +7,10 @@ const validation_layers: [1][*c]const u8 = .{
     "VK_LAYER_KHRONOS_validation",
 };
 
+const device_extensions: [1][*c]const u8 = .{
+    c.VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+};
+
 pub const Error = error{
     out_of_host_memory,
     out_of_device_memory,
@@ -66,10 +70,44 @@ pub const Instance = struct {
     }
 };
 
+pub const Surface = struct {
+    handle: c.VkSurfaceKHR,
+
+    pub fn create(instance: Instance, w: window.Window) !Surface {
+        var handle: c.VkSurfaceKHR = undefined;
+        try mapError(c.glfwCreateWindowSurface(instance.handle, w.raw, null, &handle));
+        return Surface{
+            .handle = handle,
+        };
+    }
+
+    pub fn destroy(self: *Surface, instance: Instance) void {
+        c.vkDestroySurfaceKHR(instance.handle, self.handle, null);
+    }
+};
+
 pub const Device = struct {
     handle: c.VkDevice,
+    graphics_queue: c.VkQueue,
+    present_queue: c.VkQueue,
+    command_pool: c.VkCommandPool,
+    command_buffer: c.VkCommandBuffer,
+
+    pub fn beginCommand(self: *Device) !void {
+        const begin_info: c.VkCommandBufferBeginInfo = .{
+            .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        };
+
+        try mapError(c.vkBeginCommandBuffer(self.command_buffer, &begin_info));
+    }
+
+    pub fn endCommand(self: *Device) !void {
+        try mapError(c.vkEndCommandBuffer(self.command_buffer));
+    }
 
     pub fn destroy(self: *Device) void {
+        c.vkDestroyCommandPool(self.handle, self.command_pool, null);
         c.vkDestroyDevice(self.handle, null);
     }
 };
@@ -86,19 +124,115 @@ pub const PhysicalDevice = struct {
         return PhysicalDevice{ .handle = devices[0] };
     }
 
-    pub fn create_device(self: *PhysicalDevice) !Device {
+    pub fn queueFamilyProperties(self: PhysicalDevice, allocator: Allocator) ![]const c.VkQueueFamilyProperties {
+        var count: u32 = 0;
+        c.vkGetPhysicalDeviceQueueFamilyProperties(self.handle, &count, null);
+        const family_properties = try allocator.alloc(c.VkQueueFamilyProperties, count);
+        c.vkGetPhysicalDeviceQueueFamilyProperties(self.handle, &count, @ptrCast(family_properties));
+
+        return family_properties;
+    }
+
+    pub fn graphicsQueue(self: *PhysicalDevice, allocator: Allocator) !u32 {
+        const queue_families = try self.queueFamilyProperties(allocator);
+        var graphics_queue: ?u32 = null;
+
+        for (queue_families, 0..) |family, index| {
+            if (graphics_queue) |_| {
+                break;
+            }
+
+            if ((family.queueFlags & c.VK_QUEUE_GRAPHICS_BIT) != 0x0) {
+                graphics_queue = @intCast(index);
+            }
+        }
+
+        return graphics_queue.?;
+    }
+
+    pub fn presentQueue(self: *PhysicalDevice, surface: Surface, allocator: Allocator) !u32 {
+        const queue_families = try self.queueFamilyProperties(allocator);
+        var present_queue: ?u32 = null;
+
+        for (queue_families, 0..) |_, index| {
+            if (present_queue) |_| {
+                break;
+            }
+
+            var support: u32 = undefined;
+            try mapError(c.vkGetPhysicalDeviceSurfaceSupportKHR(self.handle, @intCast(index), surface.handle, &support));
+
+            if (support == c.VK_TRUE) {
+                present_queue = @intCast(index);
+            }
+        }
+
+        return present_queue.?;
+    }
+
+    pub fn create_device(self: *PhysicalDevice, surface: Surface, allocator: Allocator) !Device {
+        const graphics_queue_index = try self.graphicsQueue(allocator);
+        const present_queue_index = try self.presentQueue(surface, allocator);
+
+        const priorities: f32 = 1.0;
+
+        const graphics_queue_info: c.VkDeviceQueueCreateInfo = .{
+            .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .queueFamilyIndex = graphics_queue_index,
+            .queueCount = 1,
+            .pQueuePriorities = &priorities,
+        };
+
+        const present_queue_info: c.VkDeviceQueueCreateInfo = .{
+            .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .queueFamilyIndex = present_queue_index,
+            .queueCount = 1,
+            .pQueuePriorities = &priorities,
+        };
+
+        const queues: [2]c.VkDeviceQueueCreateInfo = .{ graphics_queue_info, present_queue_info };
+
         const device_info: c.VkDeviceCreateInfo = .{
             .sType = c.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-            .queueCreateInfoCount = 0,
+            .queueCreateInfoCount = 1,
+            .pQueueCreateInfos = @ptrCast(queues[0..1].ptr),
             .enabledLayerCount = 0,
-            .enabledExtensionCount = 0,
+            .enabledExtensionCount = 1,
+            .ppEnabledExtensionNames = device_extensions[0..1].ptr,
         };
 
         var device: c.VkDevice = undefined;
         try mapError(c.vkCreateDevice(self.handle, &device_info, null, &device));
 
+        var graphics_queue: c.VkQueue = undefined;
+        var present_queue: c.VkQueue = undefined;
+
+        c.vkGetDeviceQueue(device, graphics_queue_index, 0, &graphics_queue);
+        c.vkGetDeviceQueue(device, present_queue_index, 0, &present_queue);
+
+        const command_pool_info: c.VkCommandPoolCreateInfo = .{
+            .sType = c.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+            .queueFamilyIndex = graphics_queue_index,
+        };
+
+        var command_pool: c.VkCommandPool = undefined;
+        try mapError(c.vkCreateCommandPool(device, &command_pool_info, null, &command_pool));
+
+        const command_buffer_info: c.VkCommandBufferAllocateInfo = .{
+            .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .commandPool = command_pool,
+            .commandBufferCount = 1,
+        };
+
+        var command_buffer: c.VkCommandBuffer = undefined;
+        try mapError(c.vkAllocateCommandBuffers(device, &command_buffer_info, &command_buffer));
+
         return Device{
             .handle = device,
+            .graphics_queue = graphics_queue,
+            .present_queue = present_queue,
+            .command_pool = command_pool,
+            .command_buffer = command_buffer,
         };
     }
 };
