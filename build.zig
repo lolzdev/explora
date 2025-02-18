@@ -15,8 +15,8 @@ pub fn build(b: *std.Build) void {
         .root_module = exe_mod,
     });
 
-    const vk_lib_name = if (target.result.os.tag == .windows) "vulkan-1" else "vulkan";
-    exe.linkSystemLibrary(vk_lib_name);
+    exe.linkSystemLibrary("vulkan");
+    exe.linkSystemLibrary("glfw3");
     exe.linkLibC();
 
     b.installArtifact(exe);
