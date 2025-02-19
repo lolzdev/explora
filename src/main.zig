@@ -1,22 +1,22 @@
 const std = @import("std");
+const c = @import("c.zig");
 const window = @import("render/window.zig");
 const vk = @import("render/vulkan.zig");
+const renderer = @import("render/renderer.zig");
 
 pub fn main() !void {
     const w = try window.Window.create(800, 600, "explora");
+    defer w.destroy();
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
-    var instance = try vk.Instance.create();
-    defer instance.destroy();
+    var r = try renderer.Renderer.create(allocator, w);
 
-    var surface = try vk.Surface.create(instance, w);
-    defer surface.destroy(instance);
+    while (!w.shouldClose()) {
+        c.glfwPollEvents();
+        try r.tick();
+    }
 
-    var physical_device = try vk.PhysicalDevice.pick(allocator, instance);
-    var device = try physical_device.create_device(surface, allocator);
-    defer device.destroy();
-
-    //while (!w.shouldClose()) {}
+    try r.device.waitIdle();
 }

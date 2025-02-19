@@ -46,4 +46,18 @@ pub const Window = struct {
     pub fn shouldClose(self: Window) bool {
         return c.glfwWindowShouldClose(self.raw) == c.GLFW_TRUE;
     }
+
+    pub fn size(self: Window) struct { usize, usize } {
+        var width: u32 = undefined;
+        var height: u32 = undefined;
+
+        c.glfwGetFramebufferSize(self.raw, @ptrCast(&width), @ptrCast(&height));
+
+        return .{ @intCast(width), @intCast(height) };
+    }
+
+    pub fn destroy(self: Window) void {
+        c.glfwDestroyWindow(self.raw);
+        c.glfwTerminate();
+    }
 };
