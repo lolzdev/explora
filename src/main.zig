@@ -19,4 +19,8 @@ pub fn main() !void {
     }
 
     try r.device.waitIdle();
+
+    if (gpa.detectLeaks()) {
+        return error.leaked_memory;
+    }
 }
