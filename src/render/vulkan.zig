@@ -79,7 +79,7 @@ pub const Instance = struct {
             .sType = c.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
             .pApplicationInfo = &app_info,
             .enabledExtensionCount = @intCast(extensions.len),
-            .ppEnabledExtensionNames = @ptrCast(extensions),
+            .ppEnabledExtensionNames = extensions.ptr,
             .enabledLayerCount = @intCast(validation_layers.len),
             .ppEnabledLayerNames = validation_layers.ptr,
         };
