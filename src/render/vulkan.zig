@@ -4,7 +4,10 @@ const window = @import("./window.zig");
 const mesh = @import("./mesh.zig");
 const Allocator = std.mem.Allocator;
 
-const validation_layers: [1][*c]const u8 = .{
+const builtin = @import("builtin");
+const debug = (builtin.mode == .Debug);
+
+const validation_layers: []const [*c]const u8 = if (!debug) &[0][*c]const u8{} else &[_][*c]const u8{
     "VK_LAYER_KHRONOS_validation",
 };
 
@@ -72,7 +75,7 @@ pub const Instance = struct {
             .enabledExtensionCount = @intCast(extensions.len),
             .ppEnabledExtensionNames = @ptrCast(extensions),
             .enabledLayerCount = @intCast(validation_layers.len),
-            .ppEnabledLayerNames = validation_layers[0..1].ptr,
+            .ppEnabledLayerNames = @ptrCast(validation_layers),
         };
 
         var instance: c.VkInstance = undefined;
