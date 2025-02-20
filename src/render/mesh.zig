@@ -37,7 +37,7 @@ pub const Vertex = struct {
 pub const Mesh = struct {
     buffer: vk.Buffer,
 
-    pub fn create(device: vk.Device) !Mesh {
+    pub fn create(device: anytype) !Mesh {
         const vertices = [_]Vertex{
             Vertex.create(0.0, -0.5, 0.0),
             Vertex.create(0.5, 0.5, 0.0),
@@ -68,7 +68,7 @@ pub const Mesh = struct {
         const vertex_buffer = try device.createBuffer(vk.BufferUsage{ .vertex_buffer = true, .transfer_dst = true }, vk.BufferFlags{ .device_local = true }, @sizeOf(Vertex) * 3);
 
         try buffer.copyTo(device, vertex_buffer);
-        buffer.destroy(device);
+        buffer.destroy(device.handle);
 
         return Mesh{
             .buffer = vertex_buffer,

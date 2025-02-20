@@ -10,10 +10,10 @@ const Renderer = @This();
 instance: vk.Instance,
 surface: vk.Surface,
 physical_device: vk.PhysicalDevice,
-device: vk.Device,
-render_pass: vk.RenderPass,
-swapchain: vk.Swapchain,
-graphics_pipeline: vk.GraphicsPipeline,
+device: vk.Device(2),
+render_pass: vk.RenderPass(2),
+swapchain: vk.Swapchain(2),
+graphics_pipeline: vk.GraphicsPipeline(2),
 current_frame: u32,
 vertex_buffer: vk.Buffer,
 
@@ -23,18 +23,18 @@ pub fn create(allocator: Allocator, w: window.Window) !Renderer {
     const surface = try vk.Surface.create(instance, w);
 
     var physical_device = try vk.PhysicalDevice.pick(allocator, instance);
-    const device = try physical_device.create_device(surface, allocator);
+    const device = try physical_device.create_device(surface, allocator, 2);
 
-    var vertex_shader = try vk.Shader.create("shader_vert", device);
-    defer vertex_shader.destroy(device);
-    var fragment_shader = try vk.Shader.create("shader_frag", device);
-    defer fragment_shader.destroy(device);
+    const vertex_shader = try device.createShader("shader_vert");
+    defer device.destroyShader(vertex_shader);
+    const fragment_shader = try device.createShader("shader_frag");
+    defer device.destroyShader(fragment_shader);
 
-    const render_pass = try vk.RenderPass.create(allocator, device, surface, physical_device);
+    const render_pass = try vk.RenderPass(2).create(allocator, device, surface, physical_device);
 
-    const swapchain = try vk.Swapchain.create(allocator, surface, device, physical_device, w, render_pass);
+    const swapchain = try vk.Swapchain(2).create(allocator, surface, device, physical_device, w, render_pass);
 
-    const graphics_pipeline = try vk.GraphicsPipeline.create(device, swapchain, render_pass, vertex_shader, fragment_shader);
+    const graphics_pipeline = try vk.GraphicsPipeline(2).create(device, swapchain, render_pass, vertex_shader, fragment_shader);
 
     // TODO: I think the renderer shouldn't have to interact with buffers. I think the API should change to
     // something along the lines of
@@ -60,7 +60,7 @@ pub fn create(allocator: Allocator, w: window.Window) !Renderer {
 }
 
 pub fn destroy(self: Renderer) void {
-    self.vertex_buffer.destroy(self.device);
+    self.vertex_buffer.destroy(self.device.handle);
     self.graphics_pipeline.destroy(self.device);
     self.swapchain.destroy(self.device);
     self.render_pass.destroy(self.device);
