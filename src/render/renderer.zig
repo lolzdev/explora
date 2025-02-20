@@ -5,75 +5,84 @@ const window = @import("window.zig");
 const mesh = @import("mesh.zig");
 const Allocator = std.mem.Allocator;
 
-pub const Renderer = struct {
-    instance: vk.Instance,
-    surface: vk.Surface,
-    physical_device: vk.PhysicalDevice,
-    device: vk.Device,
-    render_pass: vk.RenderPass,
-    swapchain: vk.Swapchain,
-    graphics_pipeline: vk.GraphicsPipeline,
-    current_frame: u32,
-    vertex_buffer: vk.Buffer,
+const Renderer = @This();
 
-    pub fn create(allocator: Allocator, w: window.Window) !Renderer {
-        const instance = try vk.Instance.create();
+instance: vk.Instance,
+surface: vk.Surface,
+physical_device: vk.PhysicalDevice,
+device: vk.Device(2),
+render_pass: vk.RenderPass(2),
+swapchain: vk.Swapchain(2),
+graphics_pipeline: vk.GraphicsPipeline(2),
+current_frame: u32,
+vertex_buffer: vk.Buffer,
 
-        const surface = try vk.Surface.create(instance, w);
+pub fn create(allocator: Allocator, w: window.Window) !Renderer {
+    const instance = try vk.Instance.create();
 
-        var physical_device = try vk.PhysicalDevice.pick(allocator, instance);
-        const device = try physical_device.create_device(surface, allocator);
+    const surface = try vk.Surface.create(instance, w);
 
-        var vertex_shader = try vk.Shader.create("shader_vert", device);
-        defer vertex_shader.destroy(device);
-        var fragment_shader = try vk.Shader.create("shader_frag", device);
-        defer fragment_shader.destroy(device);
+    var physical_device = try vk.PhysicalDevice.pick(allocator, instance);
+    const device = try physical_device.create_device(surface, allocator, 2);
 
-        const render_pass = try vk.RenderPass.create(allocator, device, surface, physical_device);
+    const vertex_shader = try device.createShader("shader_vert");
+    defer device.destroyShader(vertex_shader);
+    const fragment_shader = try device.createShader("shader_frag");
+    defer device.destroyShader(fragment_shader);
 
-        const swapchain = try vk.Swapchain.create(allocator, surface, device, physical_device, w, render_pass);
+    const render_pass = try vk.RenderPass(2).create(allocator, device, surface, physical_device);
 
-        const graphics_pipeline = try vk.GraphicsPipeline.create(device, swapchain, render_pass, vertex_shader, fragment_shader);
+    const swapchain = try vk.Swapchain(2).create(allocator, surface, device, physical_device, w, render_pass);
 
-        const triangle = try mesh.Mesh.create(device);
+    const graphics_pipeline = try vk.GraphicsPipeline(2).create(device, swapchain, render_pass, vertex_shader, fragment_shader);
 
-        return Renderer{
-            .instance = instance,
-            .surface = surface,
-            .physical_device = physical_device,
-            .device = device,
-            .render_pass = render_pass,
-            .swapchain = swapchain,
-            .graphics_pipeline = graphics_pipeline,
-            .current_frame = 0,
-            .vertex_buffer = triangle.buffer,
-        };
-    }
+    // TODO: I think the renderer shouldn't have to interact with buffers. I think the API should change to
+    // something along the lines of
+    //    renderer.begin()
+    //    renderer.render(triangle);
+    //    renderer.render(some_other_thing);
+    //    ...
+    //    renderer.submit()
+    const triangle = try mesh.Mesh.create(device);
 
-    pub fn destroy(self: Renderer) void {
-        self.graphics_pipeline.destroy(self.device);
-        self.swapchain.destroy(self.device);
-        self.render_pass.destroy(self.device);
-        self.fragment_shader.destroy(self.device);
-        self.device.destroy();
-        self.surface.destroy(self.instance);
-        self.instance.destroy();
-    }
+    return Renderer{
+        .instance = instance,
+        .surface = surface,
+        .physical_device = physical_device,
+        .device = device,
+        .render_pass = render_pass,
+        .swapchain = swapchain,
+        .graphics_pipeline = graphics_pipeline,
+        .current_frame = 0,
+        // TODO: Why are we storing the buffer and not the Mesh?
+        .vertex_buffer = triangle.buffer,
+    };
+}
 
-    pub fn tick(self: *Renderer) !void {
-        try self.device.waitFence(self.current_frame);
-        const image = try self.swapchain.nextImage(self.device, self.current_frame);
-        try self.device.resetCommand(self.current_frame);
-        try self.device.beginCommand(self.current_frame);
-        self.render_pass.begin(self.swapchain, self.device, image, self.current_frame);
-        self.graphics_pipeline.bind(self.device, self.current_frame);
-        self.device.bindVertexBuffer(self.vertex_buffer, self.current_frame);
-        self.device.draw(3, self.current_frame);
-        self.render_pass.end(self.device, self.current_frame);
-        try self.device.endCommand(self.current_frame);
+pub fn destroy(self: Renderer) void {
+    self.vertex_buffer.destroy(self.device.handle);
+    self.graphics_pipeline.destroy(self.device);
+    self.swapchain.destroy(self.device);
+    self.render_pass.destroy(self.device);
+    self.device.destroy();
+    self.surface.destroy(self.instance);
+    self.instance.destroy();
+}
 
-        try self.device.submit(self.swapchain, image, self.current_frame);
+// TODO: tick is maybe a bad name? something like present() or submit() is better?
+pub fn tick(self: *Renderer) !void {
+    try self.device.waitFence(self.current_frame);
+    const image = try self.swapchain.nextImage(self.device, self.current_frame);
+    try self.device.resetCommand(self.current_frame);
+    try self.device.beginCommand(self.current_frame);
+    self.render_pass.begin(self.swapchain, self.device, image, self.current_frame);
+    self.graphics_pipeline.bind(self.device, self.current_frame);
+    self.device.bindVertexBuffer(self.vertex_buffer, self.current_frame);
+    self.device.draw(3, self.current_frame);
+    self.render_pass.end(self.device, self.current_frame);
+    try self.device.endCommand(self.current_frame);
 
-        self.current_frame = (self.current_frame + 1) % 2;
-    }
-};
+    try self.device.submit(self.swapchain, image, self.current_frame);
+
+    self.current_frame = (self.current_frame + 1) % 2;
+}
