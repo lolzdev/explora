@@ -16,6 +16,7 @@ swapchain: vk.Swapchain(2),
 graphics_pipeline: vk.GraphicsPipeline(2),
 current_frame: u32,
 vertex_buffer: vk.Buffer,
+index_buffer: vk.Buffer,
 
 pub fn create(allocator: Allocator, w: window.Window) !Renderer {
     const instance = try vk.Instance.create();
@@ -55,7 +56,8 @@ pub fn create(allocator: Allocator, w: window.Window) !Renderer {
         .graphics_pipeline = graphics_pipeline,
         .current_frame = 0,
         // TODO: Why are we storing the buffer and not the Mesh?
-        .vertex_buffer = triangle.buffer,
+        .vertex_buffer = triangle.vertex_buffer,
+        .index_buffer = triangle.index_buffer,
     };
 }
 
@@ -78,7 +80,8 @@ pub fn tick(self: *Renderer) !void {
     self.render_pass.begin(self.swapchain, self.device, image, self.current_frame);
     self.graphics_pipeline.bind(self.device, self.current_frame);
     self.device.bindVertexBuffer(self.vertex_buffer, self.current_frame);
-    self.device.draw(3, self.current_frame);
+    self.device.bindIndexBuffer(self.index_buffer, self.current_frame);
+    self.device.draw(@intCast(self.index_buffer.size / @sizeOf(u16)), self.current_frame);
     self.render_pass.end(self.device, self.current_frame);
     try self.device.endCommand(self.current_frame);
 

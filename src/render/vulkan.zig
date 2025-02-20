@@ -675,9 +675,9 @@ pub fn Device(comptime n: usize) type {
             try mapError(c.vkEndCommandBuffer(self.command_buffers[frame]));
         }
 
-        pub fn draw(self: Self, vertices: u32, frame: usize) void {
+        pub fn draw(self: Self, indices: u32, frame: usize) void {
             std.debug.assert(frame < n);
-            c.vkCmdDraw(self.command_buffers[frame], vertices, 1, 0, 0);
+            c.vkCmdDrawIndexed(self.command_buffers[frame], indices, 1, 0, 0, 0);
         }
 
         pub fn waitFence(self: Self, frame: usize) !void {
@@ -688,6 +688,11 @@ pub fn Device(comptime n: usize) type {
 
         pub fn waitIdle(self: Self) !void {
             try mapError(c.vkDeviceWaitIdle(self.handle));
+        }
+
+        pub fn bindIndexBuffer(self: Self, buffer: Buffer, frame: usize) void {
+            std.debug.assert(frame < n);
+            c.vkCmdBindIndexBuffer(self.command_buffers[frame], buffer.handle, 0, c.VK_INDEX_TYPE_UINT16);
         }
 
         pub fn bindVertexBuffer(self: Self, buffer: Buffer, frame: usize) void {
