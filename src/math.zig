@@ -5,18 +5,26 @@ const sin = std.math.sin;
 const rad = std.math.rad;
 
 pub const Matrix = struct {
-    rows: @Vector(4, @Vector(4, f64)),
+    rows: [4]@Vector(4, f64),
 
     pub fn lookAt(eye: @Vector(3, f64), target: @Vector(3, f64), arbitrary_up: @Vector(3, f64)) Matrix {
         const forward = normalize(eye - target);
         const right = normalize(cross(arbitrary_up, forward));
-        const up = cross(forward, right);
+        _ = right;
+        //const up = cross(forward, right);
 
-        const view = @Vector(4, @Vector(4, f64)){
-            @Vector(4, f64){ right[0], right[1], right[2], 0.0 },
-            @Vector(4, f64){ up[0], up[1], up[2], 0.0 },
-            @Vector(4, f64){ forward[0], forward[1], forward[2], 0.0 },
-            @Vector(4, f64){ eye[0], eye[1], eye[2], 1.0 },
+        //const view = [_]@Vector(4, f64){
+        //    @Vector(4, f64){ right[0], right[1], right[2], 0.0 },
+        //    @Vector(4, f64){ up[0], up[1], up[2], 0.0 },
+        //    @Vector(4, f64){ forward[0], forward[1], forward[2], 0.0 },
+        //    @Vector(4, f64){ eye[0], eye[1], eye[2], 1.0 },
+        //};
+
+        const view = [_]@Vector(4, f64){
+            @Vector(4, f64){ 0.0, 1.0, 2.0, 3.0 },
+            @Vector(4, f64){ 4.0, 5.0, 6.0, 7.0 },
+            @Vector(4, f64){ 8.0, 9.0, 10.0, 11.0 },
+            @Vector(4, f64){ 12.0, 13.0, 14.0, 15.0 },
         };
 
         return Matrix{
@@ -25,7 +33,7 @@ pub const Matrix = struct {
     }
 
     pub fn perspective(fov: f64, aspect: f64, near: f64, far: f64) Matrix {
-        const projection = @Vector(4, @Vector(4, f64)){
+        const projection = [_]@Vector(4, f64){
             @Vector(4, f64){ 1.0 / (aspect * tan(fov / 2.0)), 0.0, 0.0, 0.0 },
             @Vector(4, f64){ 0.0, 1.0 / tan(fov / 2.0), 0.0, 0.0 },
             @Vector(4, f64){ 0.0, 0.0, -((far + near) / (far - near)), -((2 * far * near) / (far - near)) },

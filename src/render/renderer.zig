@@ -62,6 +62,7 @@ pub fn create(allocator: Allocator, w: window.Window) !Renderer {
 }
 
 pub fn destroy(self: Renderer) void {
+    self.index_buffer.destroy(self.device.handle);
     self.vertex_buffer.destroy(self.device.handle);
     self.graphics_pipeline.destroy(self.device);
     self.swapchain.destroy(self.device);
@@ -81,6 +82,7 @@ pub fn tick(self: *Renderer) !void {
     self.graphics_pipeline.bind(self.device, self.current_frame);
     self.device.bindVertexBuffer(self.vertex_buffer, self.current_frame);
     self.device.bindIndexBuffer(self.index_buffer, self.current_frame);
+    self.device.bindDescriptorSets(self.graphics_pipeline, self.current_frame);
     self.device.draw(@intCast(self.index_buffer.size / @sizeOf(u16)), self.current_frame);
     self.render_pass.end(self.device, self.current_frame);
     try self.device.endCommand(self.current_frame);

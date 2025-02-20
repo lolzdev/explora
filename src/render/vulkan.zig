@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @import("../c.zig");
 const window = @import("./window.zig");
 const mesh = @import("./mesh.zig");
+const math = @import("../math.zig");
 const Allocator = std.mem.Allocator;
 
 const builtin = @import("builtin");
@@ -239,6 +240,10 @@ pub fn GraphicsPipeline(comptime n: usize) type {
     return struct {
         layout: c.VkPipelineLayout,
         handle: c.VkPipeline,
+        descriptor_pool: c.VkDescriptorPool,
+        descriptor_set: c.VkDescriptorSet,
+        descriptor_set_layout: c.VkDescriptorSetLayout,
+        uniform_buffer: Buffer,
 
         const Self = @This();
 
@@ -339,10 +344,31 @@ pub fn GraphicsPipeline(comptime n: usize) type {
                 .blendConstants = .{ 0.0, 0.0, 0.0, 0.0 },
             };
 
+            const set_binding = c.VkDescriptorSetLayoutBinding{
+                .binding = 0,
+                .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .descriptorCount = 1,
+                .stageFlags = c.VK_SHADER_STAGE_VERTEX_BIT,
+            };
+
+            const bindings = [_]c.VkDescriptorSetLayoutBinding{set_binding};
+
+            var descriptor_set_layout: c.VkDescriptorSetLayout = undefined;
+
+            const descriptor_set_layout_info = c.VkDescriptorSetLayoutCreateInfo{
+                .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+                .bindingCount = 1,
+                .pBindings = bindings[0..].ptr,
+            };
+
+            try mapError(c.vkCreateDescriptorSetLayout(device.handle, &descriptor_set_layout_info, null, &descriptor_set_layout));
+
+            const set_layouts = [_]c.VkDescriptorSetLayout{descriptor_set_layout};
+
             const layout_info: c.VkPipelineLayoutCreateInfo = .{
                 .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-                .setLayoutCount = 0,
-                .pSetLayouts = null,
+                .setLayoutCount = 1,
+                .pSetLayouts = set_layouts[0..].ptr,
                 .pushConstantRangeCount = 0,
                 .pPushConstantRanges = null,
             };
@@ -374,9 +400,75 @@ pub fn GraphicsPipeline(comptime n: usize) type {
 
             try mapError(c.vkCreateGraphicsPipelines(device.handle, null, 1, &pipeline_info, null, @ptrCast(&pipeline)));
 
+            var size = c.VkDescriptorPoolSize{
+                .type = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .descriptorCount = 1,
+            };
+
+            const descriptor_pool_info = c.VkDescriptorPoolCreateInfo{
+                .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+                .maxSets = 1,
+                .poolSizeCount = 1,
+                .pPoolSizes = &size,
+            };
+
+            var descriptor_pool: c.VkDescriptorPool = undefined;
+
+            try mapError(c.vkCreateDescriptorPool(device.handle, &descriptor_pool_info, null, &descriptor_pool));
+
+            const descriptor_allocate_info = c.VkDescriptorSetAllocateInfo{
+                .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+                .descriptorPool = descriptor_pool,
+                .descriptorSetCount = 1,
+                .pSetLayouts = set_layouts[0..].ptr,
+            };
+
+            var descriptor_set: c.VkDescriptorSet = undefined;
+
+            try mapError(c.vkAllocateDescriptorSets(device.handle, &descriptor_allocate_info, &descriptor_set));
+
+            const uniform = math.Matrix.lookAt(.{ 0.0, 0.0, 3.0 }, .{ 0.0, 0.0, 0.0 }, .{ 0.0, 1.0, 0.0 });
+
+            const uniform_buffer = try device.createBuffer(BufferUsage{ .uniform_buffer = true, .transfer_dst = true }, BufferFlags{ .device_local = true }, @sizeOf(math.Matrix));
+
+            var data: [*c]u8 = undefined;
+
+            try mapError(c.vkMapMemory(
+                device.handle,
+                uniform_buffer.memory,
+                0,
+                uniform_buffer.size,
+                0,
+                @ptrCast(&data),
+            ));
+
+            @memcpy(data[0..@sizeOf(math.Matrix)], std.mem.asBytes(&uniform));
+
+            const descriptor_buffer_info = c.VkDescriptorBufferInfo{
+                .buffer = uniform_buffer.handle,
+                .offset = 0,
+                .range = uniform_buffer.size,
+            };
+
+            const write_descriptor_set = c.VkWriteDescriptorSet{
+                .sType = c.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = descriptor_set,
+                .dstBinding = 0,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .pBufferInfo = &descriptor_buffer_info,
+            };
+
+            c.vkUpdateDescriptorSets(device.handle, 1, &write_descriptor_set, 0, null);
+
             return Self{
                 .layout = layout,
                 .handle = pipeline,
+                .descriptor_pool = descriptor_pool,
+                .descriptor_set = descriptor_set,
+                .descriptor_set_layout = descriptor_set_layout,
+                .uniform_buffer = uniform_buffer,
             };
         }
 
@@ -386,6 +478,9 @@ pub fn GraphicsPipeline(comptime n: usize) type {
         }
 
         pub fn destroy(self: Self, device: Device(n)) void {
+            self.uniform_buffer.destroy(device.handle);
+            c.vkDestroyDescriptorSetLayout(device.handle, self.descriptor_set_layout, null);
+            c.vkDestroyDescriptorPool(device.handle, self.descriptor_pool, null);
             c.vkDestroyPipeline(device.handle, self.handle, null);
             c.vkDestroyPipelineLayout(device.handle, self.layout, null);
         }
@@ -699,6 +794,10 @@ pub fn Device(comptime n: usize) type {
             std.debug.assert(frame < n);
             const offset: u64 = 0;
             c.vkCmdBindVertexBuffers(self.command_buffers[frame], 0, 1, &buffer.handle, &offset);
+        }
+
+        pub fn bindDescriptorSets(self: Self, pipeline: GraphicsPipeline(n), frame: usize) void {
+            c.vkCmdBindDescriptorSets(self.command_buffers[frame], c.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1, &pipeline.descriptor_set, 0, null);
         }
 
         pub fn pick_memory_type(self: Self, type_bits: u32, flags: u32) u32 {
