@@ -22,17 +22,19 @@ pub const Error = error{
     layer_not_present,
     extension_not_present,
     incompatible_driver,
+    unknown_error,
 };
 
 pub fn mapError(result: c_int) !void {
     return switch (result) {
+        c.VK_SUCCESS => {},
         c.VK_ERROR_OUT_OF_HOST_MEMORY => Error.out_of_host_memory,
         c.VK_ERROR_OUT_OF_DEVICE_MEMORY => Error.out_of_device_memory,
         c.VK_ERROR_INITIALIZATION_FAILED => Error.initialization_failed,
         c.VK_ERROR_LAYER_NOT_PRESENT => Error.layer_not_present,
         c.VK_ERROR_EXTENSION_NOT_PRESENT => Error.extension_not_present,
         c.VK_ERROR_INCOMPATIBLE_DRIVER => Error.incompatible_driver,
-        else => {},
+        else => Error.unknown_error,
     };
 }
 
