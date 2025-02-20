@@ -38,7 +38,7 @@ pub fn mapError(result: c_int) !void {
     };
 }
 
-pub const BufferUsage = packed struct (u32) {
+pub const BufferUsage = packed struct(u32) {
     transfer_src: bool = false,
     transfer_dst: bool = false,
     uniform_texel_buffer: bool = false,
@@ -48,16 +48,16 @@ pub const BufferUsage = packed struct (u32) {
     index_buffer: bool = false,
     vertex_buffer: bool = false,
     indirect_buffer: bool = false,
-    _padding: enum (u23) { unset } = .unset,
+    _padding: enum(u23) { unset } = .unset,
 };
 
-pub const BufferFlags = packed struct (u32) {
+pub const BufferFlags = packed struct(u32) {
     device_local: bool = false,
     host_visible: bool = false,
     host_coherent: bool = false,
     host_cached: bool = false,
     lazily_allocated: bool = false,
-    _padding: enum (u27) { unset } = .unset,
+    _padding: enum(u27) { unset } = .unset,
 };
 
 pub const Instance = struct {
@@ -706,7 +706,7 @@ pub fn Device(comptime n: usize) type {
             for (0..self.memory_properties.memoryTypeCount) |index| {
                 const memory_type = self.memory_properties.memoryTypes[index];
 
-                if (((type_bits & (@as(u64, 1) << @intCast(index))) != 0) and (memory_type.propertyFlags & flags) != 0) {
+                if (((type_bits & (@as(u64, 1) << @intCast(index))) != 0) and (memory_type.propertyFlags & flags) != 0 and (memory_type.propertyFlags & c.VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD) == 0) {
                     memory_type_index = @intCast(index);
                 }
             }
@@ -756,7 +756,7 @@ pub fn Device(comptime n: usize) type {
             //const wait_semaphores: [1]c.VkSemaphore = .{self.image_available[frame]};
             //const signal_semaphores: [1]c.VkSemaphore = .{self.render_finished[frame]};
             //const swapchains: [1]c.VkSwapchainKHR = .{swapchain.handle};
-            const stages: []const u32 = &[_]u32{ c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+            const stages: []const u32 = &[_]u32{c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
             const submit_info: c.VkSubmitInfo = .{
                 .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -966,7 +966,7 @@ pub const PhysicalDevice = struct {
         var memory_properties: c.VkPhysicalDeviceMemoryProperties = undefined;
         c.vkGetPhysicalDeviceMemoryProperties(self.handle, &memory_properties);
 
-        return Device(n) {
+        return Device(n){
             .handle = device,
             .graphics_queue = graphics_queue,
             .present_queue = present_queue,
