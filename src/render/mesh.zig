@@ -46,7 +46,7 @@ pub const Mesh = struct {
 
         var data: [*c]?*anyopaque = null;
 
-        const buffer = try device.createBuffer(vk.BufferUsage.transfer_src, vk.BufferFlags.host_visible | vk.BufferFlags.host_coherent, @sizeOf(Vertex) * 3);
+        const buffer = try device.createBuffer(vk.BufferUsage{ .transfer_src = true }, vk.BufferFlags{ .host_visible = true, .host_coherent = true }, @sizeOf(Vertex) * 3);
 
         try vk.mapError(c.vkMapMemory(
             device.handle,
@@ -65,7 +65,7 @@ pub const Mesh = struct {
 
         c.vkUnmapMemory(device.handle, buffer.memory);
 
-        const vertex_buffer = try device.createBuffer(vk.BufferUsage.vertex_buffer | vk.BufferUsage.transfer_dst, vk.BufferFlags.device_local, @sizeOf(Vertex) * 3);
+        const vertex_buffer = try device.createBuffer(vk.BufferUsage{ .vertex_buffer = true, .transfer_dst = true }, vk.BufferFlags{ .device_local = true }, @sizeOf(Vertex) * 3);
 
         try buffer.copyTo(device, vertex_buffer);
         buffer.destroy(device);

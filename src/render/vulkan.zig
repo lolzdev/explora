@@ -36,22 +36,26 @@ pub fn mapError(result: c_int) !void {
     };
 }
 
-pub const BufferUsage = struct {
-    pub const transfer_src: u32 = 0x00000001;
-    pub const transfer_dst: u32 = 0x00000002;
-    pub const uniform_texel_buffer: u32 = 0x00000004;
-    pub const storage_texel_buffer: u32 = 0x00000008;
-    pub const uniform_buffer: u32 = 0x00000010;
-    pub const storage_buffer: u32 = 0x00000020;
-    pub const index_buffer: u32 = 0x00000040;
-    pub const vertex_buffer: u32 = 0x00000080;
-    pub const indirect_buffer: u32 = 0x00000100;
+pub const BufferUsage = packed struct (u32) {
+    transfer_src: bool = false,
+    transfer_dst: bool = false,
+    uniform_texel_buffer: bool = false,
+    storage_texel_buffer: bool = false,
+    uniform_buffer: bool = false,
+    storage_buffer: bool = false,
+    index_buffer: bool = false,
+    vertex_buffer: bool = false,
+    indirect_buffer: bool = false,
+    _padding: enum (u23) { unset } = .unset,
 };
 
-pub const BufferFlags = struct {
-    pub const host_visible = c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-    pub const host_coherent = c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    pub const device_local = c.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+pub const BufferFlags = packed struct (u32) {
+    device_local: bool = false,
+    host_visible: bool = false,
+    host_coherent: bool = false,
+    host_cached: bool = false,
+    lazily_allocated: bool = false,
+    _padding: enum (u27) { unset } = .unset,
 };
 
 pub const Instance = struct {
@@ -684,14 +688,14 @@ pub const Device = struct {
         return memory_type_index;
     }
 
-    pub fn createBuffer(self: Device, usage: u32, flags: u32, size: usize) !Buffer {
+    pub fn createBuffer(self: Device, usage: BufferUsage, flags: BufferFlags, size: usize) !Buffer {
         const family_indices: [1]u32 = .{self.graphics_family};
 
         const create_info: c.VkBufferCreateInfo = .{
             .sType = c.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             .size = size,
             .sharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
-            .usage = usage,
+            .usage = @bitCast(usage),
             .queueFamilyIndexCount = 1,
             .pQueueFamilyIndices = family_indices[0..1].ptr,
         };
@@ -705,7 +709,7 @@ pub const Device = struct {
         const alloc_info: c.VkMemoryAllocateInfo = .{
             .sType = c.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .allocationSize = memory_requirements.size,
-            .memoryTypeIndex = self.pick_memory_type(memory_requirements.memoryTypeBits, flags),
+            .memoryTypeIndex = self.pick_memory_type(memory_requirements.memoryTypeBits, @bitCast(flags)),
         };
 
         var device_memory: c.VkDeviceMemory = undefined;
