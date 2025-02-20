@@ -46,11 +46,13 @@ pub const Renderer = struct {
             .swapchain = swapchain,
             .graphics_pipeline = graphics_pipeline,
             .current_frame = 0,
+            // TODO: Why are we storing the buffer and not the Mesh?
             .vertex_buffer = triangle.buffer,
         };
     }
 
     pub fn destroy(self: Renderer) void {
+        self.vertex_buffer.destroy(self.device);
         self.graphics_pipeline.destroy(self.device);
         self.swapchain.destroy(self.device);
         self.render_pass.destroy(self.device);

@@ -11,7 +11,7 @@ const validation_layers: []const [*c]const u8 = if (!debug) &[0][*c]const u8{} e
     "VK_LAYER_KHRONOS_validation",
 };
 
-const device_extensions: [1][*c]const u8 = .{
+const device_extensions: []const [*c]const u8 = &[_][*c]const u8{
     c.VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 };
 
@@ -75,7 +75,7 @@ pub const Instance = struct {
             .enabledExtensionCount = @intCast(extensions.len),
             .ppEnabledExtensionNames = @ptrCast(extensions),
             .enabledLayerCount = @intCast(validation_layers.len),
-            .ppEnabledLayerNames = @ptrCast(validation_layers),
+            .ppEnabledLayerNames = validation_layers.ptr,
         };
 
         var instance: c.VkInstance = undefined;
@@ -853,27 +853,27 @@ pub const PhysicalDevice = struct {
 
         const queues: [2]c.VkDeviceQueueCreateInfo = .{ graphics_queue_info, present_queue_info };
 
-        var coherent_bit_amd: c.VkPhysicalDeviceCoherentMemoryFeaturesAMD = .{
-            .sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COHERENT_MEMORY_FEATURES_AMD,
-        };
+        //var coherent_bit_amd: c.VkPhysicalDeviceCoherentMemoryFeaturesAMD = .{
+        //    .sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COHERENT_MEMORY_FEATURES_AMD,
+        //};
         var device_features: c.VkPhysicalDeviceFeatures2 = .{
             .sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-            .pNext = &coherent_bit_amd,
+            //.pNext = &coherent_bit_amd,
         };
 
         c.vkGetPhysicalDeviceFeatures2(self.handle, &device_features);
 
-        const features: [1][*c]const u8 = .{
-            c.VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME,
-        };
+        //const features: [1][*c]const u8 = .{
+        //    c.VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME,
+        //};
 
-        var extensions: [][*c]const u8 = undefined;
-        if (coherent_bit_amd.deviceCoherentMemory == c.VK_TRUE) {
-            extensions = @constCast((device_extensions ++ features)[0..2]);
-            std.debug.print("{s}\n", .{extensions[1]});
-        } else {
-            extensions = @constCast(device_extensions[0..1]);
-        }
+        //var extensions: []const [*c]const u8 = undefined;
+        //if (coherent_bit_amd.deviceCoherentMemory == c.VK_TRUE) {
+        //    extensions = &(device_extensions ++ features);
+        //    std.debug.print("{s}\n", .{extensions[1]});
+        //} else {
+        //    extensions = &device_extensions;
+        //}
 
         const device_info: c.VkDeviceCreateInfo = .{
             .sType = c.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -881,8 +881,8 @@ pub const PhysicalDevice = struct {
             .queueCreateInfoCount = 1,
             .pQueueCreateInfos = @ptrCast(queues[0..1].ptr),
             .enabledLayerCount = 0,
-            .enabledExtensionCount = @intCast(extensions.len),
-            .ppEnabledExtensionNames = extensions[0..extensions.len].ptr,
+            .enabledExtensionCount = @intCast(device_extensions.len),
+            .ppEnabledExtensionNames = device_extensions.ptr,
         };
 
         var device: c.VkDevice = undefined;
