@@ -54,7 +54,6 @@ pub const Renderer = struct {
         self.graphics_pipeline.destroy(self.device);
         self.swapchain.destroy(self.device);
         self.render_pass.destroy(self.device);
-        self.fragment_shader.destroy(self.device);
         self.device.destroy();
         self.surface.destroy(self.instance);
         self.instance.destroy();

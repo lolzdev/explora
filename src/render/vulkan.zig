@@ -84,7 +84,7 @@ pub const Instance = struct {
         };
     }
 
-    pub fn destroy(self: *Instance) void {
+    pub fn destroy(self: Instance) void {
         c.vkDestroyInstance(self.handle, null);
     }
 };
@@ -405,8 +405,11 @@ pub const Swapchain = struct {
     extent: c.VkExtent2D,
     framebuffers: []c.VkFramebuffer,
 
+    allocator: Allocator,
+
     pub fn pickFormat(allocator: Allocator, surface: Surface, physical_device: PhysicalDevice) !c.VkSurfaceFormatKHR {
         const formats = try surface.formats(allocator, physical_device);
+        defer allocator.free(formats);
         var format: ?c.VkSurfaceFormatKHR = null;
 
         for (formats) |fmt| {
@@ -424,6 +427,7 @@ pub const Swapchain = struct {
 
     pub fn create(allocator: Allocator, surface: Surface, device: Device, physical_device: PhysicalDevice, w: window.Window, render_pass: RenderPass) !Swapchain {
         const present_modes = try surface.presentModes(allocator, physical_device);
+        defer allocator.free(present_modes);
         const capabilities = try surface.capabilities(physical_device);
         var present_mode: ?c.VkPresentModeKHR = null;
         var extent: c.VkExtent2D = undefined;
@@ -540,6 +544,7 @@ pub const Swapchain = struct {
             .images = images[0..image_count],
             .image_views = image_views[0..image_count],
             .framebuffers = framebuffers,
+            .allocator = allocator,
         };
     }
 
@@ -560,6 +565,10 @@ pub const Swapchain = struct {
         }
 
         c.vkDestroySwapchainKHR(device.handle, self.handle, null);
+
+        self.allocator.free(self.images);
+        self.allocator.free(self.image_views);
+        self.allocator.free(self.framebuffers);
     }
 };
 
@@ -598,10 +607,15 @@ pub const Surface = struct {
         return caps;
     }
 
-    pub fn destroy(self: *Surface, instance: Instance) void {
+    pub fn destroy(self: Surface, instance: Instance) void {
         c.vkDestroySurfaceKHR(instance.handle, self.handle, null);
     }
 };
+
+// TODO: Maybe device should be parametrized by number of in-flight frames,
+//     therefore it would not need an allocator and could be stored directly
+//     in memory. Maybe it doesn't even need to be parametrized as the way the
+//     code is written right now it can only be 3.
 
 pub const Device = struct {
     handle: c.VkDevice,
@@ -615,6 +629,8 @@ pub const Device = struct {
     graphics_family: u32,
     present_family: u32,
     memory_properties: c.VkPhysicalDeviceMemoryProperties,
+
+    allocator: Allocator,
 
     pub fn resetCommand(self: Device, frame: usize) !void {
         try mapError(c.vkResetCommandBuffer(self.command_buffers[frame], 0));
@@ -734,7 +750,7 @@ pub const Device = struct {
         try mapError(c.vkQueuePresentKHR(self.present_queue, &present_info));
     }
 
-    pub fn destroy(self: *Device) void {
+    pub fn destroy(self: Device) void {
         for (0..2) |index| {
             c.vkDestroySemaphore(self.handle, self.image_available[index], null);
             c.vkDestroySemaphore(self.handle, self.render_finished[index], null);
@@ -743,6 +759,11 @@ pub const Device = struct {
 
         c.vkDestroyCommandPool(self.handle, self.command_pool, null);
         c.vkDestroyDevice(self.handle, null);
+
+        self.allocator.free(self.image_available);
+        self.allocator.free(self.in_flight_fence);
+        self.allocator.free(self.render_finished);
+        self.allocator.free(self.command_buffers);
     }
 };
 
@@ -753,6 +774,7 @@ pub const PhysicalDevice = struct {
         var device_count: u32 = 0;
         try mapError(c.vkEnumeratePhysicalDevices(instance.handle, &device_count, null));
         const devices = try allocator.alloc(c.VkPhysicalDevice, device_count);
+        defer allocator.free(devices);
         try mapError(c.vkEnumeratePhysicalDevices(instance.handle, &device_count, @ptrCast(devices)));
 
         return PhysicalDevice{ .handle = devices[0] };
@@ -769,6 +791,7 @@ pub const PhysicalDevice = struct {
 
     pub fn graphicsQueue(self: PhysicalDevice, allocator: Allocator) !u32 {
         const queue_families = try self.queueFamilyProperties(allocator);
+        defer allocator.free(queue_families);
         var graphics_queue: ?u32 = null;
 
         for (queue_families, 0..) |family, index| {
@@ -781,13 +804,12 @@ pub const PhysicalDevice = struct {
             }
         }
 
-        allocator.free(queue_families);
-
         return graphics_queue.?;
     }
 
     pub fn presentQueue(self: PhysicalDevice, surface: Surface, allocator: Allocator) !u32 {
         const queue_families = try self.queueFamilyProperties(allocator);
+        defer allocator.free(queue_families);
         var present_queue: ?u32 = null;
 
         for (queue_families, 0..) |_, index| {
@@ -802,8 +824,6 @@ pub const PhysicalDevice = struct {
                 present_queue = @intCast(index);
             }
         }
-
-        allocator.free(queue_families);
 
         return present_queue.?;
     }
@@ -924,6 +944,7 @@ pub const PhysicalDevice = struct {
             .graphics_family = graphics_queue_index,
             .present_family = present_queue_index,
             .memory_properties = memory_properties,
+            .allocator = allocator,
         };
     }
 };
