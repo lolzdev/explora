@@ -3,6 +3,7 @@ const c = @import("c.zig");
 const window = @import("render/window.zig");
 const vk = @import("render/vulkan.zig");
 const Renderer = @import("render/renderer.zig");
+const math = @import("math.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
