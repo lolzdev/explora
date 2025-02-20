@@ -640,11 +640,6 @@ pub const Surface = struct {
     }
 };
 
-// TODO: Maybe device should be parametrized by number of in-flight frames,
-//     therefore it would not need an allocator and could be stored directly
-//     in memory. Maybe it doesn't even need to be parametrized as the way the
-//     code is written right now it can only be 3.
-
 pub fn Device(comptime n: usize) type {
     return struct {
         handle: c.VkDevice,
