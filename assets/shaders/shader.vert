@@ -9,5 +9,5 @@ layout(binding = 0) uniform UniformObject {
 } ubo;
 
 void main() {
-    gl_Position = ubo.view * ubo.proj * ubo.model * vec4(vertPos, 1.0);
+    gl_Position = ubo.view * ubo.proj * vec4(vertPos, 1.0);
 }

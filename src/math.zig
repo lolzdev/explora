@@ -4,7 +4,6 @@ pub const cos = std.math.cos;
 pub const sin = std.math.sin;
 pub const rad = std.math.degreesToRadians;
 
-// TODO: uniform buffers work, projections are acting weird.
 pub const Matrix = struct {
     rows: [4]@Vector(4, f32),
 
@@ -17,7 +16,7 @@ pub const Matrix = struct {
             @Vector(4, f32){ right[0], right[1], right[2], 0.0 },
             @Vector(4, f32){ up[0], up[1], up[2], 0.0 },
             @Vector(4, f32){ forward[0], forward[1], forward[2], 0.0 },
-            @Vector(4, f32){ eye[0], eye[1], eye[2], 1.0 },
+            @Vector(4, f32){ 0.0, 0.0, 1.0, eye[2] },
         };
 
         return Matrix{

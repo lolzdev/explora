@@ -435,7 +435,7 @@ pub fn GraphicsPipeline(comptime n: usize) type {
 
             const proj = math.Matrix.perspective(math.rad(45.0), (@as(f32, @floatFromInt(swapchain.extent.width)) / @as(f32, @floatFromInt(swapchain.extent.height))), 0.1, 10.0);
 
-            const view = math.Matrix.lookAt(@Vector(3, f32){ 0.0, 0.0, 1.0 }, @Vector(3, f32){ 0.0, 0.0, 0.0 }, @Vector(3, f32){ 0.0, 1.0, 0.0 });
+            const view = math.Matrix.lookAt(@Vector(3, f32){ 0.0, 0.0, 10.0 }, @Vector(3, f32){ 0.0, 0.0, 0.0 }, @Vector(3, f32){ 0.0, 1.0, 0.0 });
             const model = math.Matrix.identity();
 
             const uniform = Uniform{
