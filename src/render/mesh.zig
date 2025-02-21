@@ -40,10 +40,10 @@ pub const Mesh = struct {
 
     pub fn createVertexBuffer(device: anytype) !vk.Buffer {
         const vertices = [_]Vertex{
-            Vertex.create(0.5, -0.5, 0.0),
-            Vertex.create(0.5, 0.5, 0.0),
-            Vertex.create(-0.5, 0.5, 0.0),
-            Vertex.create(-0.5, -0.5, 0.0),
+            Vertex.create(0.5, -0.5, -0.5),
+            Vertex.create(0.5, 0.5, -0.5),
+            Vertex.create(-0.5, 0.5, -0.5),
+            Vertex.create(-0.5, -0.5, -0.5),
         };
 
         var data: [*c]?*anyopaque = null;

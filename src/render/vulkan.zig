@@ -8,6 +8,12 @@ const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
 const debug = (builtin.mode == .Debug);
 
+const Uniform = struct {
+    proj: math.Matrix,
+    view: math.Matrix,
+    model: math.Matrix,
+};
+
 const validation_layers: []const [*c]const u8 = if (!debug) &[0][*c]const u8{} else &[_][*c]const u8{
     "VK_LAYER_KHRONOS_validation",
 };
@@ -427,9 +433,18 @@ pub fn GraphicsPipeline(comptime n: usize) type {
 
             try mapError(c.vkAllocateDescriptorSets(device.handle, &descriptor_allocate_info, &descriptor_set));
 
-            const uniform = math.Matrix.lookAt(.{ 0.0, 0.0, 3.0 }, .{ 0.0, 0.0, 0.0 }, .{ 0.0, 1.0, 0.0 });
+            const proj = math.Matrix.perspective(math.rad(45.0), (@as(f32, @floatFromInt(swapchain.extent.width)) / @as(f32, @floatFromInt(swapchain.extent.height))), 0.1, 10.0);
 
-            const uniform_buffer = try device.createBuffer(BufferUsage{ .uniform_buffer = true, .transfer_dst = true }, BufferFlags{ .device_local = true }, @sizeOf(math.Matrix));
+            const view = math.Matrix.lookAt(@Vector(3, f32){ 0.0, 0.0, 1.0 }, @Vector(3, f32){ 0.0, 0.0, 0.0 }, @Vector(3, f32){ 0.0, 1.0, 0.0 });
+            const model = math.Matrix.identity();
+
+            const uniform = Uniform{
+                .proj = proj,
+                .view = view,
+                .model = model,
+            };
+
+            const uniform_buffer = try device.createBuffer(BufferUsage{ .uniform_buffer = true, .transfer_dst = true }, BufferFlags{ .device_local = true }, @sizeOf(Uniform));
 
             var data: [*c]u8 = undefined;
 
@@ -442,7 +457,7 @@ pub fn GraphicsPipeline(comptime n: usize) type {
                 @ptrCast(&data),
             ));
 
-            @memcpy(data[0..@sizeOf(math.Matrix)], std.mem.asBytes(&uniform));
+            @memcpy(data[0..(@sizeOf(math.Matrix) * 3)], std.mem.asBytes(&uniform));
 
             const descriptor_buffer_info = c.VkDescriptorBufferInfo{
                 .buffer = uniform_buffer.handle,

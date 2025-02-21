@@ -1,30 +1,23 @@
 const std = @import("std");
-const tan = std.math.tan;
-const cos = std.math.cos;
-const sin = std.math.sin;
-const rad = std.math.rad;
+pub const tan = std.math.tan;
+pub const cos = std.math.cos;
+pub const sin = std.math.sin;
+pub const rad = std.math.degreesToRadians;
 
+// TODO: uniform buffers work, projections are acting weird.
 pub const Matrix = struct {
-    rows: [4]@Vector(4, f64),
+    rows: [4]@Vector(4, f32),
 
-    pub fn lookAt(eye: @Vector(3, f64), target: @Vector(3, f64), arbitrary_up: @Vector(3, f64)) Matrix {
+    pub fn lookAt(eye: @Vector(3, f32), target: @Vector(3, f32), arbitrary_up: @Vector(3, f32)) Matrix {
         const forward = normalize(eye - target);
         const right = normalize(cross(arbitrary_up, forward));
-        _ = right;
-        //const up = cross(forward, right);
+        const up = cross(forward, right);
 
-        //const view = [_]@Vector(4, f64){
-        //    @Vector(4, f64){ right[0], right[1], right[2], 0.0 },
-        //    @Vector(4, f64){ up[0], up[1], up[2], 0.0 },
-        //    @Vector(4, f64){ forward[0], forward[1], forward[2], 0.0 },
-        //    @Vector(4, f64){ eye[0], eye[1], eye[2], 1.0 },
-        //};
-
-        const view = [_]@Vector(4, f64){
-            @Vector(4, f64){ 0.0, 1.0, 2.0, 3.0 },
-            @Vector(4, f64){ 4.0, 5.0, 6.0, 7.0 },
-            @Vector(4, f64){ 8.0, 9.0, 10.0, 11.0 },
-            @Vector(4, f64){ 12.0, 13.0, 14.0, 15.0 },
+        const view = [_]@Vector(4, f32){
+            @Vector(4, f32){ right[0], right[1], right[2], 0.0 },
+            @Vector(4, f32){ up[0], up[1], up[2], 0.0 },
+            @Vector(4, f32){ forward[0], forward[1], forward[2], 0.0 },
+            @Vector(4, f32){ eye[0], eye[1], eye[2], 1.0 },
         };
 
         return Matrix{
@@ -32,28 +25,41 @@ pub const Matrix = struct {
         };
     }
 
-    pub fn perspective(fov: f64, aspect: f64, near: f64, far: f64) Matrix {
-        const projection = [_]@Vector(4, f64){
-            @Vector(4, f64){ 1.0 / (aspect * tan(fov / 2.0)), 0.0, 0.0, 0.0 },
-            @Vector(4, f64){ 0.0, 1.0 / tan(fov / 2.0), 0.0, 0.0 },
-            @Vector(4, f64){ 0.0, 0.0, -((far + near) / (far - near)), -((2 * far * near) / (far - near)) },
-            @Vector(4, f64){ 0.0, 0.0, -1.0, 0.0 },
+    pub fn perspective(fov: f32, aspect: f32, near: f32, far: f32) Matrix {
+        const projection = [_]@Vector(4, f32){
+            @Vector(4, f32){ 1.0 / (aspect * tan(fov / 2.0)), 0.0, 0.0, 0.0 },
+            @Vector(4, f32){ 0.0, 1.0 / tan(fov / 2.0), 0.0, 0.0 },
+            @Vector(4, f32){ 0.0, 0.0, -((far + near) / (far - near)), -((2 * far * near) / (far - near)) },
+            @Vector(4, f32){ 0.0, 0.0, -1.0, 1.0 },
         };
 
         return Matrix{
             .rows = projection,
         };
     }
+
+    pub fn identity() Matrix {
+        const view = [_]@Vector(4, f32){
+            @Vector(4, f32){ 1.0, 0.0, 0.0, 0.0 },
+            @Vector(4, f32){ 0.0, 1.0, 0.0, 0.0 },
+            @Vector(4, f32){ 0.0, 0.0, 1.0, 0.0 },
+            @Vector(4, f32){ 0.0, 0.0, 0.0, 1.0 },
+        };
+
+        return Matrix{
+            .rows = view,
+        };
+    }
 };
 
-pub fn dot(a: @Vector(3, f64), b: @Vector(3, f64)) f64 {
+pub fn dot(a: @Vector(3, f32), b: @Vector(3, f32)) f32 {
     return @reduce(.Add, a * b);
 }
 
-pub fn cross(a: @Vector(3, f64), b: @Vector(3, f64)) @Vector(3, f64) {
-    return @Vector(3, f64){ a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0] };
+pub fn cross(a: @Vector(3, f32), b: @Vector(3, f32)) @Vector(3, f32) {
+    return @Vector(3, f32){ a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0] };
 }
 
-pub fn normalize(a: @Vector(3, f64)) @Vector(3, f64) {
-    return a / @as(@Vector(3, f64), @splat(@sqrt(dot(a, a))));
+pub fn normalize(a: @Vector(3, f32)) @Vector(3, f32) {
+    return a / @as(@Vector(3, f32), @splat(@sqrt(dot(a, a))));
 }
