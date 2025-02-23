@@ -64,7 +64,12 @@ pub fn build(b: *std.Build) void {
 
     exe.linkSystemLibrary("vulkan");
     exe.addIncludePath(b.path("ext/glfw/include"));
+    exe.addIncludePath(b.path("src/render/"));
     exe.linkLibrary(glfw);
+    exe.addCSourceFile(.{
+        .file = b.path("src/render/glad.c"),
+        .flags = &[_][]const u8{"-Iinclude"},
+    });
     exe.linkLibC();
 
     compileAllShaders(b, exe);
