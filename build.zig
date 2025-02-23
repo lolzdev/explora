@@ -55,6 +55,8 @@ pub fn build(b: *std.Build) void {
     }, .flags = &[_][]const u8{ "-D_GLFW_X11", "-Wall", "-Wextra" } });
     glfw.linkLibC();
 
+    const opengl = b.option(bool, "opengl", "Use OpenGL instead of Vulkan.") orelse false;
+
     const exe = b.addExecutable(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
@@ -62,6 +64,9 @@ pub fn build(b: *std.Build) void {
         .name = "explora",
     });
 
+    const options = b.addOptions();
+    options.addOption(bool, "opengl", opengl);
+    exe.root_module.addOptions("config", options);
     exe.linkSystemLibrary("vulkan");
     exe.addIncludePath(b.path("ext/glfw/include"));
     exe.linkLibrary(glfw);
