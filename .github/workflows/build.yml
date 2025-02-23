@@ -17,5 +17,5 @@ jobs:
         with:
           submodules: 'true'
       - uses: mlugg/setup-zig@v1
-      - run: sudo apt install -y glslc libx11-dev
+      - run: sudo apt install -y glslc libx11-dev libxcursor-dev
       - run: zig build
