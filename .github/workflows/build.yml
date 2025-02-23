@@ -17,4 +17,5 @@ jobs:
       - uses: mlugg/setup-zig@v1
         with:
           version: master
+      - run: sudo apt install -y glslc
       - run: zig build
