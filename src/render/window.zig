@@ -34,6 +34,7 @@ pub const Window = struct {
         c.glfwWindowHint(c.GLFW_RESIZABLE, c.GLFW_FALSE);
         c.glfwWindowHint(c.GLFW_CLIENT_API, c.GLFW_NO_API);
         const raw = c.glfwCreateWindow(@intCast(width), @intCast(height), title.ptr, null, null);
+        c.glfwShowWindow(raw);
 
         return Window{
             .title = title,
