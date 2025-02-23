@@ -15,6 +15,9 @@ pub fn main() !void {
         var runtime = try vm.Runtime.init(allocator, module);
         defer runtime.deinit(allocator);
 
+        var parameters = [_]usize{ 3, 6 };
+        try runtime.call(allocator, "init", &parameters);
+
         const w = try window.Window.create(800, 600, "explora");
         defer w.destroy();
 
