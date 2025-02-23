@@ -4,18 +4,22 @@ const Allocator = std.mem.Allocator;
 
 pub const Module = struct {
     types: []FunctionType,
-    imports: []Import,
-    exports: []Export,
+    imports: std.StringHashMap(Import),
+    exports: std.StringHashMap(u8),
     functions: []u8,
     memory: Memory,
     contents: []u8,
     code: []FunctionBody,
 
-    pub fn deinit(self: Module, allocator: Allocator) void {
+    pub fn deinit(self: *Module, allocator: Allocator) void {
+        for (self.code) |f| {
+            allocator.free(f.locals);
+        }
+
+        self.imports.deinit();
+        self.exports.deinit();
         allocator.free(self.code);
         allocator.free(self.types);
-        allocator.free(self.exports);
-        allocator.free(self.imports);
         allocator.free(self.contents);
     }
 };
@@ -39,14 +43,8 @@ pub const FunctionType = struct {
     results: []u8,
 };
 
-pub const Export = struct {
-    name: []u8,
-    index: u8,
-};
-
 pub const Import = struct {
     module: []u8,
-    name: []u8,
     signature: u8,
 };
 
@@ -65,8 +63,8 @@ pub fn parseWasm(allocator: Allocator) !Module {
     );
 
     var types: []FunctionType = undefined;
-    var imports: []Import = undefined;
-    var exports: []Export = undefined;
+    var imports = std.StringHashMap(Import).init(allocator);
+    var exports = std.StringHashMap(u8).init(allocator);
     var functions: []u8 = undefined;
     var memory: Memory = undefined;
     var code: []FunctionBody = undefined;
@@ -100,22 +98,23 @@ pub fn parseWasm(allocator: Allocator) !Module {
             0x2 => {
                 index += 2;
                 const import_count = contents[index];
-                imports = try allocator.alloc(Import, import_count);
                 index += 1;
-                for (0..import_count) |i| {
+                for (0..import_count) |_| {
                     var string_length = contents[index];
                     index += 1;
-                    imports[i].module = contents[index..(index + string_length)];
+                    var import: Import = undefined;
+                    import.module = contents[index..(index + string_length)];
                     index += string_length;
                     string_length = contents[index];
                     index += 1;
-                    imports[i].name = contents[index..(index + string_length)];
+                    const name = contents[index..(index + string_length)];
                     index += string_length;
 
                     // kind (skip for now)
                     index += 1;
-                    imports[i].signature = contents[index];
+                    import.signature = contents[index];
                     index += 1;
+                    try imports.put(name, import);
                 }
             },
             // Function section
@@ -148,17 +147,17 @@ pub fn parseWasm(allocator: Allocator) !Module {
             0x7 => {
                 index += 2;
                 const export_count = contents[index];
-                exports = try allocator.alloc(Export, export_count);
                 index += 1;
-                for (0..export_count) |i| {
+                for (0..export_count) |_| {
                     const string_length = contents[index];
                     index += 1;
-                    exports[i].name = contents[index..(index + string_length)];
+                    const name = contents[index..(index + string_length)];
                     index += string_length;
                     // kind (skip for now)
                     index += 1;
-                    exports[i].index = contents[index];
+                    const signature = contents[index];
                     index += 1;
+                    try exports.put(name, signature);
                 }
             },
             // Code section
