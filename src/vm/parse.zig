@@ -4,20 +4,36 @@ const Allocator = std.mem.Allocator;
 
 pub const Module = struct {
     types: []FunctionType,
-    imports: []Import,
-    exports: []Export,
+    imports: std.ArrayList(Import),
+    exports: std.StringHashMap(u8),
     functions: []u8,
     memory: Memory,
     contents: []u8,
     code: []FunctionBody,
+    funcs: std.ArrayList(Function),
 
-    pub fn deinit(self: Module, allocator: Allocator) void {
+    pub fn deinit(self: *Module, allocator: Allocator) void {
+        for (self.code) |f| {
+            allocator.free(f.locals);
+        }
+
+        self.funcs.deinit();
+        self.imports.deinit();
+        self.exports.deinit();
         allocator.free(self.code);
         allocator.free(self.types);
-        allocator.free(self.exports);
-        allocator.free(self.imports);
         allocator.free(self.contents);
     }
+};
+
+pub const FunctionScope = enum {
+    external,
+    internal,
+};
+
+pub const Function = union(FunctionScope) {
+    external: u8,
+    internal: u8,
 };
 
 pub const Local = struct {
@@ -39,14 +55,9 @@ pub const FunctionType = struct {
     results: []u8,
 };
 
-pub const Export = struct {
-    name: []u8,
-    index: u8,
-};
-
 pub const Import = struct {
-    module: []u8,
     name: []u8,
+    module: []u8,
     signature: u8,
 };
 
@@ -65,8 +76,9 @@ pub fn parseWasm(allocator: Allocator) !Module {
     );
 
     var types: []FunctionType = undefined;
-    var imports: []Import = undefined;
-    var exports: []Export = undefined;
+    var imports = std.ArrayList(Import).init(allocator);
+    var exports = std.StringHashMap(u8).init(allocator);
+    var funcs = std.ArrayList(Function).init(allocator);
     var functions: []u8 = undefined;
     var memory: Memory = undefined;
     var code: []FunctionBody = undefined;
@@ -100,22 +112,27 @@ pub fn parseWasm(allocator: Allocator) !Module {
             0x2 => {
                 index += 2;
                 const import_count = contents[index];
-                imports = try allocator.alloc(Import, import_count);
                 index += 1;
                 for (0..import_count) |i| {
                     var string_length = contents[index];
                     index += 1;
-                    imports[i].module = contents[index..(index + string_length)];
+                    var import: Import = undefined;
+                    import.module = contents[index..(index + string_length)];
                     index += string_length;
                     string_length = contents[index];
                     index += 1;
-                    imports[i].name = contents[index..(index + string_length)];
+                    import.name = contents[index..(index + string_length)];
                     index += string_length;
 
                     // kind (skip for now)
                     index += 1;
-                    imports[i].signature = contents[index];
+                    import.signature = contents[index];
                     index += 1;
+                    try imports.append(import);
+                    const f = Function{
+                        .external = @intCast(i),
+                    };
+                    try funcs.append(f);
                 }
             },
             // Function section
@@ -148,17 +165,19 @@ pub fn parseWasm(allocator: Allocator) !Module {
             0x7 => {
                 index += 2;
                 const export_count = contents[index];
-                exports = try allocator.alloc(Export, export_count);
                 index += 1;
-                for (0..export_count) |i| {
+                for (0..export_count) |_| {
                     const string_length = contents[index];
                     index += 1;
-                    exports[i].name = contents[index..(index + string_length)];
+                    const name = contents[index..(index + string_length)];
                     index += string_length;
-                    // kind (skip for now)
+                    const kind = contents[index];
                     index += 1;
-                    exports[i].index = contents[index];
+                    const signature = contents[index];
                     index += 1;
+                    if (kind == 0x0) {
+                        try exports.put(name, signature);
+                    }
                 }
             },
             // Code section
@@ -189,6 +208,9 @@ pub fn parseWasm(allocator: Allocator) !Module {
 
                     code[i].code = contents[index..(index + (function_size - local_count))];
                     index += function_size - local_count;
+
+                    const f = Function{ .internal = @intCast(i) };
+                    try funcs.append(f);
                 }
             },
             else => index += sec_size + 2,
@@ -205,5 +227,6 @@ pub fn parseWasm(allocator: Allocator) !Module {
         .memory = memory,
         .exports = exports,
         .code = code,
+        .funcs = funcs,
     };
 }
