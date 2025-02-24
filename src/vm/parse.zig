@@ -4,24 +4,36 @@ const Allocator = std.mem.Allocator;
 
 pub const Module = struct {
     types: []FunctionType,
-    imports: std.StringHashMap(Import),
+    imports: std.ArrayList(Import),
     exports: std.StringHashMap(u8),
     functions: []u8,
     memory: Memory,
     contents: []u8,
     code: []FunctionBody,
+    funcs: std.ArrayList(Function),
 
     pub fn deinit(self: *Module, allocator: Allocator) void {
         for (self.code) |f| {
             allocator.free(f.locals);
         }
 
+        self.funcs.deinit();
         self.imports.deinit();
         self.exports.deinit();
         allocator.free(self.code);
         allocator.free(self.types);
         allocator.free(self.contents);
     }
+};
+
+pub const FunctionScope = enum {
+    external,
+    internal,
+};
+
+pub const Function = union(FunctionScope) {
+    external: u8,
+    internal: u8,
 };
 
 pub const Local = struct {
@@ -44,6 +56,7 @@ pub const FunctionType = struct {
 };
 
 pub const Import = struct {
+    name: []u8,
     module: []u8,
     signature: u8,
 };
@@ -63,8 +76,9 @@ pub fn parseWasm(allocator: Allocator) !Module {
     );
 
     var types: []FunctionType = undefined;
-    var imports = std.StringHashMap(Import).init(allocator);
+    var imports = std.ArrayList(Import).init(allocator);
     var exports = std.StringHashMap(u8).init(allocator);
+    var funcs = std.ArrayList(Function).init(allocator);
     var functions: []u8 = undefined;
     var memory: Memory = undefined;
     var code: []FunctionBody = undefined;
@@ -99,7 +113,7 @@ pub fn parseWasm(allocator: Allocator) !Module {
                 index += 2;
                 const import_count = contents[index];
                 index += 1;
-                for (0..import_count) |_| {
+                for (0..import_count) |i| {
                     var string_length = contents[index];
                     index += 1;
                     var import: Import = undefined;
@@ -107,14 +121,18 @@ pub fn parseWasm(allocator: Allocator) !Module {
                     index += string_length;
                     string_length = contents[index];
                     index += 1;
-                    const name = contents[index..(index + string_length)];
+                    import.name = contents[index..(index + string_length)];
                     index += string_length;
 
                     // kind (skip for now)
                     index += 1;
                     import.signature = contents[index];
                     index += 1;
-                    try imports.put(name, import);
+                    try imports.append(import);
+                    const f = Function{
+                        .external = @intCast(i),
+                    };
+                    try funcs.append(f);
                 }
             },
             // Function section
@@ -153,11 +171,13 @@ pub fn parseWasm(allocator: Allocator) !Module {
                     index += 1;
                     const name = contents[index..(index + string_length)];
                     index += string_length;
-                    // kind (skip for now)
+                    const kind = contents[index];
                     index += 1;
                     const signature = contents[index];
                     index += 1;
-                    try exports.put(name, signature);
+                    if (kind == 0x0) {
+                        try exports.put(name, signature);
+                    }
                 }
             },
             // Code section
@@ -188,6 +208,9 @@ pub fn parseWasm(allocator: Allocator) !Module {
 
                     code[i].code = contents[index..(index + (function_size - local_count))];
                     index += function_size - local_count;
+
+                    const f = Function{ .internal = @intCast(i) };
+                    try funcs.append(f);
                 }
             },
             else => index += sec_size + 2,
@@ -204,5 +227,6 @@ pub fn parseWasm(allocator: Allocator) !Module {
         .memory = memory,
         .exports = exports,
         .code = code,
+        .funcs = funcs,
     };
 }

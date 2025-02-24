@@ -6,17 +6,21 @@ const Renderer = @import("render/renderer.zig");
 const math = @import("math.zig");
 const Parser = @import("vm/parse.zig");
 const vm = @import("vm/vm.zig");
+const wasm = @import("vm/wasm.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     {
+        var global_runtime = wasm.GlobalRuntime.init(allocator);
+        defer global_runtime.deinit();
+        try global_runtime.addFunction("debug", wasm.debug);
         const module = try Parser.parseWasm(allocator);
-        var runtime = try vm.Runtime.init(allocator, module);
+        var runtime = try vm.Runtime.init(allocator, module, &global_runtime);
         defer runtime.deinit(allocator);
 
         var parameters = [_]usize{ 3, 6 };
-        try runtime.call(allocator, "init", &parameters);
+        try runtime.callExternal(allocator, "init", &parameters);
 
         const w = try window.Window.create(800, 600, "explora");
         defer w.destroy();
