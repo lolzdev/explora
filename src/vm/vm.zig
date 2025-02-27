@@ -79,8 +79,8 @@ pub const Runtime = struct {
                     try self.stack.append(frame.locals[integer.@"1"]);
                 },
                 0x6a => {
-                    const a = self.stack.pop();
-                    const b = self.stack.pop();
+                    const a = self.stack.pop().?;
+                    const b = self.stack.pop().?;
                     try self.stack.append(.{ .i32 = a.i32 + b.i32 });
                 },
                 0x10 => {
