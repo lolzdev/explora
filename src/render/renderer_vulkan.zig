@@ -61,7 +61,8 @@ pub fn create(allocator: Allocator, w: window.Window) !Renderer {
     };
 }
 
-pub fn destroy(self: Renderer) void {
+pub fn destroy(self: Renderer) !void {
+    try self.device.waitIdle();
     self.index_buffer.destroy(self.device.handle);
     self.vertex_buffer.destroy(self.device.handle);
     self.graphics_pipeline.destroy(self.device);

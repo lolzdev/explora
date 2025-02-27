@@ -55,23 +55,21 @@ pub fn build(b: *std.Build) void {
     }, .flags = &[_][]const u8{ "-D_GLFW_X11", "-Wall", "-Wextra" } });
     glfw.linkLibC();
 
-    const opengl = b.option(bool, "opengl", "Use OpenGL instead of Vulkan.") orelse false;
-
     const exe = b.addExecutable(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
         .name = "explora",
     });
+    exe.addIncludePath(b.path("ext/glfw/include"));
 
     //  If "opengl" was passed as an option, this statement will define USE_OPENGL,
     //  which will be checked inside renderer.zig, it will use the opengl backend if that was defined,
     //  else it won't thus the backend will be vulkan
+    const opengl = b.option(bool, "opengl", "Use OpenGL instead of Vulkan.") orelse false;
     const options = b.addOptions();
     options.addOption(bool, "opengl", opengl);
     exe.root_module.addOptions("config", options);
-    exe.linkSystemLibrary("vulkan");
-    exe.addIncludePath(b.path("ext/glfw/include"));
     if (opengl) {
       exe.addIncludePath(b.path("ext/gl/include"));
       exe.addCSourceFile(.{
@@ -79,6 +77,7 @@ pub fn build(b: *std.Build) void {
           .flags = &[_][]const u8{"-Iinclude"},
       });
     } else {
+      exe.linkSystemLibrary("vulkan");
       compileAllShaders(b, exe);
     }
     exe.linkLibrary(glfw);

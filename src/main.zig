@@ -1,15 +1,14 @@
 const std = @import("std");
 const c = @import("c.zig");
 const window = @import("render/window.zig");
-//const vk = @import("render/vulkan.zig");
-const gl = @import("render/opengl.zig");
-//const Renderer = @import("render/renderer.zig");
+
+const config = @import("config");
+const Renderer = if (config.opengl) @import("render/renderer_opengl.zig") else @import("render/renderer_vulkan.zig");
+
 const math = @import("math.zig");
 const Parser = @import("vm/parse.zig");
 const vm = @import("vm/vm.zig");
 const wasm = @import("vm/wasm.zig");
-
-// @h3llll : I've temporarly commented vulkan code because im too lazy to figure out how to make the build system chose the library at compiletime and not check for it at runtime because that's just ugly and ugh i hate if statements so yeah
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -28,15 +27,14 @@ pub fn main() !void {
         const w = try window.Window.create(800, 600, "explora");
         defer w.destroy();
 
-        //var r = try Renderer.create(allocator, w);
-        //defer r.destroy();
+        // TODO: Renderer.destroy should not return an error?
+        var r = try Renderer.create(allocator, w);
+        defer r.destroy() catch {};
 
         while (!w.shouldClose()) {
             c.glfwPollEvents();
-            //try r.tick();
+            try r.tick();
         }
-
-        //try r.device.waitIdle();
     }
 
     if (gpa.detectLeaks()) {
