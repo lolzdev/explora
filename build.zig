@@ -63,13 +63,10 @@ pub fn build(b: *std.Build) void {
     });
     exe.addIncludePath(b.path("ext/glfw/include"));
 
-<<<<<<< HEAD
-=======
     //  If "opengl" was passed as an option, this statement will define USE_OPENGL,
     //  which will be checked inside renderer.zig, it will use the opengl backend if that was defined,
     //  else it won't thus the backend will be vulkan
     const opengl = b.option(bool, "opengl", "Use OpenGL instead of Vulkan.") orelse false;
->>>>>>> 3d5b53f1857026fc4cab4e14a11dfdfc0d565abe
     const options = b.addOptions();
     options.addOption(bool, "opengl", opengl);
     exe.root_module.addOptions("config", options);
@@ -80,12 +77,8 @@ pub fn build(b: *std.Build) void {
             .flags = &[_][]const u8{"-Iinclude"},
         });
     } else {
-<<<<<<< HEAD
+        exe.linkSystemLibrary("vulkan");
         compileAllShaders(b, exe);
-=======
-      exe.linkSystemLibrary("vulkan");
-      compileAllShaders(b, exe);
->>>>>>> 3d5b53f1857026fc4cab4e14a11dfdfc0d565abe
     }
     exe.linkLibrary(glfw);
     exe.linkLibC();

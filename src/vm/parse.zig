@@ -2,7 +2,7 @@ const std = @import("std");
 const wasm = @import("wasm.zig");
 const Allocator = std.mem.Allocator;
 
-pub const Error = error {
+pub const Error = error{
     malformed_wasm,
     invalid_utf8,
 };
@@ -44,8 +44,6 @@ pub const Module = struct {
         allocator.free(self.code);
 
         self.funcs.deinit();
-
-
     }
 };
 
@@ -134,7 +132,7 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
     //     rather than  having undefined behavior when user provides an invalid wasm file.
     @setRuntimeSafety(true);
     loop: while (stream.readByte()) |byte| {
-        const section_size  = try std.leb.readULEB128(u32, stream);
+        const section_size = try std.leb.readULEB128(u32, stream);
         switch (@as(std.wasm.Section, @enumFromInt(byte))) {
             std.wasm.Section.custom => {
                 // TODO: unimplemented
@@ -144,7 +142,7 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
                 const type_count = try std.leb.readULEB128(u32, stream);
                 types = try allocator.alloc(FunctionType, type_count);
                 for (types) |*t| {
-                    if (!(try stream.isBytes(&.{ 0x60 }))) return Error.malformed_wasm;
+                    if (!(try stream.isBytes(&.{0x60}))) return Error.malformed_wasm;
                     const params_count = try std.leb.readULEB128(u32, stream);
                     t.parameters = try allocator.alloc(u8, params_count);
                     if (try stream.read(t.parameters) != params_count) {
@@ -169,7 +167,7 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
                     const b = try stream.readByte();
                     switch (@as(std.wasm.ExternalKind, @enumFromInt(b))) {
                         std.wasm.ExternalKind.function => try funcs.append(.{ .external = @intCast(i) }),
-                            // TODO: not implemented
+                        // TODO: not implemented
                         std.wasm.ExternalKind.table => {},
                         std.wasm.ExternalKind.memory => {},
                         std.wasm.ExternalKind.global => {},
@@ -225,7 +223,7 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
                     switch (@as(std.wasm.ExternalKind, @enumFromInt(b))) {
                         std.wasm.ExternalKind.function => try exports.put(nm, idx),
                         // TODO: unimplemented,
-                        std.wasm.ExternalKind.table  => allocator.free(nm),
+                        std.wasm.ExternalKind.table => allocator.free(nm),
                         std.wasm.ExternalKind.memory => allocator.free(nm),
                         std.wasm.ExternalKind.global => allocator.free(nm),
                     }
@@ -253,16 +251,11 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
                     }
                     code[i].locals = locals;
 
-<<<<<<< HEAD
-                    code[i].code = contents[index..(index + (function_size - local_count))];
-                    index += function_size - local_count - 2;
-=======
                     // TODO: maybe is better to parse code into ast here and not do it every frame?
                     // FIXME: This calculation is plain wrong. Resolving above TODO should help
                     code[i].code = try allocator.alloc(u8, code_size - local_count - 1);
                     // TODO: better error reporting
                     if (try stream.read(code[i].code) != code_size - local_count - 1) return Error.malformed_wasm;
->>>>>>> 3d5b53f1857026fc4cab4e14a11dfdfc0d565abe
 
                     const f = Function{ .internal = @intCast(i) };
                     try funcs.append(f);

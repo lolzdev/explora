@@ -4,24 +4,18 @@ const Parser = @import("parse.zig");
 const Allocator = std.mem.Allocator;
 const AllocationError = error{OutOfMemory};
 
-<<<<<<< HEAD
-pub fn leb128Decode(comptime T: type, bytes: []u8) struct { usize, T } {
-    var result = @as(T, 0);
-    var shift = @as(if (T == u32 or T == i32) u5 else u6, 0);
-=======
 pub fn leb128Decode(comptime T: type, bytes: []u8) struct { len: usize, val: T } {
     switch (@typeInfo(T)) {
-        .int => {},
+        .Int => {},
         else => @compileError("LEB128 integer decoding only support integers, but got " ++ @typeName(T)),
     }
-    if (@typeInfo(T).int.bits != 32 and @typeInfo(T).int.bits != 64) {
-        @compileError("LEB128 integer decoding only supports 32 or 64 bits integers but got " ++ std.fmt.comptimePrint("{d} bits", .{@typeInfo(T).int.bits} ));
+    if (@typeInfo(T).Int.bits != 32 and @typeInfo(T).Int.bits != 64) {
+        @compileError("LEB128 integer decoding only supports 32 or 64 bits integers but got " ++ std.fmt.comptimePrint("{d} bits", .{@typeInfo(T).int.bits}));
     }
 
     var result: T = 0;
     // TODO: is the type of shift important. Reading Wikipedia (not very much tho) it seems like we can use u32 and call it a day...
-    var shift: if (@typeInfo(T).int.bits == 32) u5 else u10 = 0;
->>>>>>> 3d5b53f1857026fc4cab4e14a11dfdfc0d565abe
+    var shift: if (@typeInfo(T).Int.bits == 32) u5 else u6 = 0;
     var byte: u8 = undefined;
     var len: usize = 0;
     for (bytes) |b| {
@@ -33,7 +27,7 @@ pub fn leb128Decode(comptime T: type, bytes: []u8) struct { len: usize, val: T }
         }
         shift += 7;
     }
-    if (@typeInfo(T).int.signedness == .signed) {
+    if (@typeInfo(T).Int.signedness == .signed) {
         const size = @sizeOf(T) * 8;
         if (shift < size and (byte & 0x40) != 0) {
             result |= (~@as(T, 0) << shift);
@@ -120,9 +114,9 @@ pub const Runtime = struct {
                 },
                 0x0d => {
                     const label = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += label.@"0";
+                    frame.program_counter += label.len;
                     var address = @as(usize, 0);
-                    for (0..(label.@"1")) |_| {
+                    for (0..(label.val)) |_| {
                         address = self.labels.pop();
                     }
 
@@ -140,72 +134,72 @@ pub const Runtime = struct {
                 0x21 => {
                     const integer = leb128Decode(u32, frame.code[frame.program_counter..]);
 
-                    frame.program_counter += integer.@"0";
-                    frame.locals[integer.@"1"] = self.stack.pop();
+                    frame.program_counter += integer.len;
+                    frame.locals[integer.val] = self.stack.pop();
                 },
                 0x22 => {
                     const integer = leb128Decode(u32, frame.code[frame.program_counter..]);
 
-                    frame.program_counter += integer.@"0";
-                    frame.locals[integer.@"1"] = self.stack.pop();
-                    try self.stack.append(Value{ .i32 = @intCast(integer.@"1") });
+                    frame.program_counter += integer.len;
+                    frame.locals[integer.val] = self.stack.pop();
+                    try self.stack.append(Value{ .i32 = @intCast(integer.val) });
                 },
                 0x28 => {
                     const address = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += address.@"0";
+                    frame.program_counter += address.len;
                     const offset = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += offset.@"0";
-                    const start = (address.@"1" + offset.@"1");
+                    frame.program_counter += offset.len;
+                    const start = (address.val + offset.val);
                     const end = start + @sizeOf(u32);
                     try self.stack.append(Value{ .i32 = decodeLittleEndian(i32, self.memory[start..end]) });
                 },
                 0x29 => {
                     const address = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += address.@"0";
+                    frame.program_counter += address.len;
                     const offset = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += offset.@"0";
-                    const start = (address.@"1" + offset.@"1");
+                    frame.program_counter += offset.len;
+                    const start = (address.val + offset.val);
                     const end = start + @sizeOf(u64);
                     try self.stack.append(Value{ .i64 = decodeLittleEndian(i64, self.memory[start..end]) });
                 },
                 0x36 => {
                     const address = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += address.@"0";
+                    frame.program_counter += address.len;
                     const offset = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += offset.@"0";
-                    const start = (address.@"1" + offset.@"1");
+                    frame.program_counter += offset.len;
+                    const start = (address.val + offset.val);
                     const end = start + @sizeOf(u32);
                     try self.stack.append(Value{ .i32 = decodeLittleEndian(i32, self.memory[start..end]) });
                 },
                 0x37 => {
                     const address = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += address.@"0";
+                    frame.program_counter += address.len;
                     const offset = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += offset.@"0";
-                    const start = (address.@"1" + offset.@"1");
+                    frame.program_counter += offset.len;
+                    const start = (address.val + offset.val);
                     const end = start + @sizeOf(u32);
                     encodeLittleEndian(i32, @constCast(&self.memory[start..end]), self.stack.pop().i32);
                 },
                 0x38 => {
                     const address = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += address.@"0";
+                    frame.program_counter += address.len;
                     const offset = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += offset.@"0";
-                    const start = (address.@"1" + offset.@"1");
+                    frame.program_counter += offset.len;
+                    const start = (address.val + offset.val);
                     const end = start + @sizeOf(u64);
                     encodeLittleEndian(i64, @constCast(&self.memory[start..end]), self.stack.pop().i64);
                 },
                 0x41 => {
                     const integer = leb128Decode(i32, frame.code[frame.program_counter..]);
 
-                    frame.program_counter += integer.@"0";
-                    try self.stack.append(Value{ .i32 = integer.@"1" });
+                    frame.program_counter += integer.len;
+                    try self.stack.append(Value{ .i32 = integer.val });
                 },
                 0x42 => {
                     const integer = leb128Decode(i64, frame.code[frame.program_counter..]);
 
-                    frame.program_counter += integer.@"0";
-                    try self.stack.append(Value{ .i64 = integer.@"1" });
+                    frame.program_counter += integer.len;
+                    try self.stack.append(Value{ .i64 = integer.val });
                 },
                 0x45 => {
                     try self.stack.append(Value{ .i32 = @intCast(@as(u1, @bitCast(self.stack.pop().i32 == 0))) });
@@ -308,8 +302,8 @@ pub const Runtime = struct {
                     try self.stack.append(Value{ .i32 = i });
                 },
                 0x6a => {
-                    const a = self.stack.pop().?;
-                    const b = self.stack.pop().?;
+                    const a = self.stack.pop();
+                    const b = self.stack.pop();
                     try self.stack.append(.{ .i32 = a.i32 + b.i32 });
                 },
                 0x6b => {
