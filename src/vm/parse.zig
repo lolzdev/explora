@@ -207,7 +207,7 @@ pub fn parseWasm(allocator: Allocator) !Module {
                     code[i].locals = locals;
 
                     code[i].code = contents[index..(index + (function_size - local_count))];
-                    index += function_size - local_count;
+                    index += function_size - local_count - 2;
 
                     const f = Function{ .internal = @intCast(i) };
                     try funcs.append(f);

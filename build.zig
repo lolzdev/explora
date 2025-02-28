@@ -64,22 +64,19 @@ pub fn build(b: *std.Build) void {
         .name = "explora",
     });
 
-    //  If "opengl" was passed as an option, this statement will define USE_OPENGL,
-    //  which will be checked inside renderer.zig, it will use the opengl backend if that was defined,
-    //  else it won't thus the backend will be vulkan
     const options = b.addOptions();
     options.addOption(bool, "opengl", opengl);
     exe.root_module.addOptions("config", options);
     exe.linkSystemLibrary("vulkan");
     exe.addIncludePath(b.path("ext/glfw/include"));
     if (opengl) {
-      exe.addIncludePath(b.path("ext/gl/include"));
-      exe.addCSourceFile(.{
-          .file = b.path("ext/gl/src/glad.c"),
-          .flags = &[_][]const u8{"-Iinclude"},
-      });
+        exe.addIncludePath(b.path("ext/gl/include"));
+        exe.addCSourceFile(.{
+            .file = b.path("ext/gl/src/glad.c"),
+            .flags = &[_][]const u8{"-Iinclude"},
+        });
     } else {
-      compileAllShaders(b, exe);
+        compileAllShaders(b, exe);
     }
     exe.linkLibrary(glfw);
     exe.linkLibC();
