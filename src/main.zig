@@ -17,7 +17,9 @@ pub fn main() !void {
         var global_runtime = wasm.GlobalRuntime.init(allocator);
         defer global_runtime.deinit();
         try global_runtime.addFunction("debug", wasm.debug);
-        const module = try Parser.parseWasm(allocator);
+
+        const file = try std.fs.cwd().openFile("assets/core.wasm", .{});
+        const module = try Parser.parseWasm(allocator, file.reader());
         var runtime = try vm.Runtime.init(allocator, module, &global_runtime);
         defer runtime.deinit(allocator);
 
