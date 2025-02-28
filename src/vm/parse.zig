@@ -100,7 +100,7 @@ pub fn parseType(t: u8) wasm.Type {
 }
 
 pub fn parseName(allocator: Allocator, stream: anytype) ![]u8 {
-    const size = try std.leb.readUleb128(u32, stream);
+    const size = try std.leb.readULEB128(u32, stream);
     const str = try allocator.alloc(u8, size);
     if (try stream.read(str) != size) {
         // TODO: better error
@@ -134,24 +134,24 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
     //     rather than  having undefined behavior when user provides an invalid wasm file.
     @setRuntimeSafety(true);
     loop: while (stream.readByte()) |byte| {
-        const section_size  = try std.leb.readUleb128(u32, stream);
+        const section_size  = try std.leb.readULEB128(u32, stream);
         switch (@as(std.wasm.Section, @enumFromInt(byte))) {
             std.wasm.Section.custom => {
                 // TODO: unimplemented
                 break :loop;
             },
             std.wasm.Section.type => {
-                const type_count = try std.leb.readUleb128(u32, stream);
+                const type_count = try std.leb.readULEB128(u32, stream);
                 types = try allocator.alloc(FunctionType, type_count);
                 for (types) |*t| {
                     if (!(try stream.isBytes(&.{ 0x60 }))) return Error.malformed_wasm;
-                    const params_count = try std.leb.readUleb128(u32, stream);
+                    const params_count = try std.leb.readULEB128(u32, stream);
                     t.parameters = try allocator.alloc(u8, params_count);
                     if (try stream.read(t.parameters) != params_count) {
                         // TODO: better errors
                         return Error.malformed_wasm;
                     }
-                    const results = try std.leb.readUleb128(u32, stream);
+                    const results = try std.leb.readULEB128(u32, stream);
                     t.results = try allocator.alloc(u8, results);
                     if (try stream.read(t.results) != results) {
                         // TODO: better errors
@@ -161,7 +161,7 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
             },
             std.wasm.Section.import => {
                 // Can there be more than one import section?
-                const import_count = try std.leb.readUleb128(u32, stream);
+                const import_count = try std.leb.readULEB128(u32, stream);
                 for (0..import_count) |i| {
                     const mod = try parseName(allocator, stream);
                     const nm = try parseName(allocator, stream);
@@ -174,7 +174,7 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
                         std.wasm.ExternalKind.memory => {},
                         std.wasm.ExternalKind.global => {},
                     }
-                    const idx = try std.leb.readUleb128(u32, stream);
+                    const idx = try std.leb.readULEB128(u32, stream);
                     try imports.append(.{
                         .module = mod,
                         .name = nm,
@@ -183,10 +183,10 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
                 }
             },
             std.wasm.Section.function => {
-                const function_count = try std.leb.readUleb128(u32, stream);
+                const function_count = try std.leb.readULEB128(u32, stream);
                 functions = try allocator.alloc(u32, function_count);
                 for (functions) |*f| {
-                    f.* = try std.leb.readUleb128(u32, stream);
+                    f.* = try std.leb.readULEB128(u32, stream);
                 }
             },
             std.wasm.Section.table => {
@@ -194,14 +194,14 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
                 try stream.skipBytes(section_size, .{});
             },
             std.wasm.Section.memory => {
-                const memory_count = try std.leb.readUleb128(u32, stream);
+                const memory_count = try std.leb.readULEB128(u32, stream);
                 for (0..memory_count) |_| {
                     const b = try stream.readByte();
-                    const n = try std.leb.readUleb128(u32, stream);
+                    const n = try std.leb.readULEB128(u32, stream);
                     var m: u32 = 0;
                     switch (b) {
                         0x00 => {},
-                        0x01 => m = try std.leb.readUleb128(u32, stream),
+                        0x01 => m = try std.leb.readULEB128(u32, stream),
                         else => return Error.malformed_wasm,
                     }
                     // TODO: support multiple memories
@@ -217,11 +217,11 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
             },
             // TODO: Can there be more than one export section? Otherwise we can optimize allocations
             std.wasm.Section.@"export" => {
-                const export_count = try std.leb.readUleb128(u32, stream);
+                const export_count = try std.leb.readULEB128(u32, stream);
                 for (0..export_count) |_| {
                     const nm = try parseName(allocator, stream);
                     const b = try stream.readByte();
-                    const idx = try std.leb.readUleb128(u32, stream);
+                    const idx = try std.leb.readULEB128(u32, stream);
                     switch (@as(std.wasm.ExternalKind, @enumFromInt(b))) {
                         std.wasm.ExternalKind.function => try exports.put(nm, idx),
                         // TODO: unimplemented,
@@ -240,14 +240,14 @@ pub fn parseWasm(allocator: Allocator, stream: anytype) !Module {
                 try stream.skipBytes(section_size, .{});
             },
             std.wasm.Section.code => {
-                const code_count = try std.leb.readUleb128(u32, stream);
+                const code_count = try std.leb.readULEB128(u32, stream);
                 code = try allocator.alloc(FunctionBody, code_count);
                 for (0..code_count) |i| {
-                    const code_size = try std.leb.readUleb128(u32, stream);
-                    const local_count = try std.leb.readUleb128(u32, stream);
+                    const code_size = try std.leb.readULEB128(u32, stream);
+                    const local_count = try std.leb.readULEB128(u32, stream);
                     const locals = try allocator.alloc(Local, local_count);
                     for (locals) |*l| {
-                        const n = try std.leb.readUleb128(u32, stream);
+                        const n = try std.leb.readULEB128(u32, stream);
                         l.types = try allocator.alloc(u8, n);
                         @memset(l.types, try stream.readByte());
                     }
