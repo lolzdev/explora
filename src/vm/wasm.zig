@@ -29,7 +29,7 @@ pub const GlobalRuntime = struct {
 };
 
 pub fn debug(stack: *std.ArrayList(vm.Value)) void {
-    const a = stack.pop();
+    const a = stack.pop().?;
 
     std.debug.print("{}\n", .{a.i32});
 }

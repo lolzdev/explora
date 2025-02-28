@@ -4,11 +4,26 @@ const Parser = @import("parse.zig");
 const Allocator = std.mem.Allocator;
 const AllocationError = error{OutOfMemory};
 
+<<<<<<< HEAD
 pub fn leb128Decode(comptime T: type, bytes: []u8) struct { usize, T } {
     var result = @as(T, 0);
     var shift = @as(if (T == u32 or T == i32) u5 else u6, 0);
+=======
+pub fn leb128Decode(comptime T: type, bytes: []u8) struct { len: usize, val: T } {
+    switch (@typeInfo(T)) {
+        .int => {},
+        else => @compileError("LEB128 integer decoding only support integers, but got " ++ @typeName(T)),
+    }
+    if (@typeInfo(T).int.bits != 32 and @typeInfo(T).int.bits != 64) {
+        @compileError("LEB128 integer decoding only supports 32 or 64 bits integers but got " ++ std.fmt.comptimePrint("{d} bits", .{@typeInfo(T).int.bits} ));
+    }
+
+    var result: T = 0;
+    // TODO: is the type of shift important. Reading Wikipedia (not very much tho) it seems like we can use u32 and call it a day...
+    var shift: if (@typeInfo(T).int.bits == 32) u5 else u10 = 0;
+>>>>>>> 3d5b53f1857026fc4cab4e14a11dfdfc0d565abe
     var byte: u8 = undefined;
-    var len = @as(usize, 0);
+    var len: usize = 0;
     for (bytes) |b| {
         len += 1;
         result |= @as(T, @intCast((b & 0x7f))) << shift;
@@ -18,16 +33,14 @@ pub fn leb128Decode(comptime T: type, bytes: []u8) struct { usize, T } {
         }
         shift += 7;
     }
-    if (T == i32 or T == i64) {
+    if (@typeInfo(T).int.signedness == .signed) {
         const size = @sizeOf(T) * 8;
         if (shift < size and (byte & 0x40) != 0) {
             result |= (~@as(T, 0) << shift);
         }
-    } else if (T != u64 and T != u32) {
-        @compileError("LEB128 integer decoding only supports 32 or 64 bits integers.");
     }
 
-    return .{ len, result };
+    return .{ .len = len, .val = result };
 }
 
 pub fn decodeLittleEndian(comptime T: type, bytes: []u8) T {
@@ -121,8 +134,8 @@ pub const Runtime = struct {
                 0x20 => {
                     const integer = leb128Decode(u32, frame.code[frame.program_counter..]);
 
-                    frame.program_counter += integer.@"0";
-                    try self.stack.append(frame.locals[integer.@"1"]);
+                    frame.program_counter += integer.len;
+                    try self.stack.append(frame.locals[integer.val]);
                 },
                 0x21 => {
                     const integer = leb128Decode(u32, frame.code[frame.program_counter..]);
@@ -295,8 +308,8 @@ pub const Runtime = struct {
                     try self.stack.append(Value{ .i32 = i });
                 },
                 0x6a => {
-                    const a = self.stack.pop();
-                    const b = self.stack.pop();
+                    const a = self.stack.pop().?;
+                    const b = self.stack.pop().?;
                     try self.stack.append(.{ .i32 = a.i32 + b.i32 });
                 },
                 0x6b => {
@@ -480,9 +493,9 @@ pub const Runtime = struct {
 
                 0x10 => {
                     const integer = leb128Decode(u32, frame.code[frame.program_counter..]);
-                    frame.program_counter += integer.@"0";
+                    frame.program_counter += integer.len;
 
-                    self.call(allocator, integer.@"1", &[_]usize{}) catch {};
+                    self.call(allocator, integer.val, &[_]usize{}) catch {};
                 },
                 0xb => {
                     if (for_loop) {

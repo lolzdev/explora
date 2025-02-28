@@ -17,5 +17,7 @@ jobs:
         with:
           submodules: 'true'
       - uses: mlugg/setup-zig@v1
+        with:
+          version: 0.14.0-dev.3427+dea72d15d
       - run: sudo apt install -y glslc libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libvulkan-dev libgl-dev
       - run: zig build
