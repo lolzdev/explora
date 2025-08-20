@@ -37,6 +37,7 @@ pub fn leb128Decode(comptime T: type, bytes: []u8) struct { len: usize, val: T }
     return .{ .len = len, .val = result };
 }
 
+// TODO: there is a std function for this
 pub fn decodeLittleEndian(comptime T: type, bytes: []u8) T {
     if (T != i32 and T != i64) {
         return @as(T, 0);
@@ -49,6 +50,7 @@ pub fn decodeLittleEndian(comptime T: type, bytes: []u8) T {
     }
 }
 
+// TODO: there is a std function for this
 pub fn encodeLittleEndian(comptime T: type, bytes: *[]u8, value: T) void {
     for (0..@sizeOf(T)) |b| {
         bytes.*[b] = @intCast(((value >> @intCast((@sizeOf(T) - b - 1))) & 0xff));
